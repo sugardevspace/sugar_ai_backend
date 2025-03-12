@@ -51,7 +51,7 @@ async def handle_stream_chat_event(request: Request):
                 "https://api.openai.com/v1/chat/completions",
                 json={
                     "model": "gpt-4o",
-                    "max_tokens": 20,
+                    "max_tokens": 200,
                     "messages": [
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": user_message},
