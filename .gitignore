@@ -172,3 +172,25 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+upload_persona.py
+upload_fire_west_diary.py
+.gitignore
+query_persona.py
+.gitignore
+openai_json.py
+query_fire_west_diary.py
+killua_response.json
+.gitignore
+character_persona.json
+fire_west_diary_sample.json
+.DS_Store
+test/
+ChatTest/
+tests/
+.DS_Store
+.DS_Store
+formatted_conversations.json
+messages.json
+server.py
+.vscode/Plugin Skeleton.code-snippets
+config/sugarAI_Firebase_Admin_SDK.json
