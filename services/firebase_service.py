@@ -159,6 +159,51 @@ class FirebaseService:
             self.logger.error(f"更新文檔失敗: {e}")
             return False
 
+    def update_array_field(self,
+                           collection: str,
+                           document_id: str,
+                           field: str,
+                           values: List[Any],
+                           operation: str = "append") -> bool:
+        """
+        更新文檔中的陣列欄位，可以追加或移除元素
+
+        參數:
+            collection: 集合名稱
+            document_id: 文檔 ID
+            field: 要更新的陣列欄位名稱
+            values: 要追加或移除的值列表
+            operation: 操作類型，"append" 表示追加, "remove" 表示移除
+
+        返回:
+            bool: 操作是否成功
+        """
+        # 確保已初始化
+        if not self.initialized:
+            self.initialize()
+
+        try:
+            # 獲取文檔引用
+            doc_ref = self.db.collection(collection).document(document_id)
+
+            # 根據操作類型選擇適當的陣列操作
+            if operation == "append":
+                # 使用 array_union 添加元素 (僅添加不存在的元素)
+                doc_ref.update({field: firestore.ArrayUnion(values)})
+                self.logger.info(f"陣列欄位追加成功: {collection}/{document_id}/{field}")
+            elif operation == "remove":
+                # 使用 array_remove 移除元素
+                doc_ref.update({field: firestore.ArrayRemove(values)})
+                self.logger.info(f"陣列欄位移除成功: {collection}/{document_id}/{field}")
+            else:
+                self.logger.error(f"不支持的陣列操作: {operation}")
+                return False
+
+            return True
+        except Exception as e:
+            self.logger.error(f"更新陣列欄位失敗: {e}")
+            return False
+
     def delete_document(self, collection: str, document_id: str) -> bool:
         """
         刪除 Firestore 文檔

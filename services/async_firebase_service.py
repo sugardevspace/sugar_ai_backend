@@ -84,6 +84,28 @@ class AsyncFirebaseService:
         """
         return await asyncio.to_thread(self.firebase_service.update_document, collection, document_id, data)
 
+    async def update_array_field(self,
+                                 collection: str,
+                                 document_id: str,
+                                 field: str,
+                                 values: List[Any],
+                                 operation: str = "append") -> bool:
+        """
+        非同步更新文檔中的陣列欄位，可以追加或移除元素
+
+        Args:
+            collection: 集合名稱
+            document_id: 文檔 ID
+            field: 要更新的陣列欄位名稱
+            values: 要追加或移除的值列表
+            operation: 操作類型，"append" 表示追加, "remove" 表示移除
+
+        Returns:
+            bool: 操作是否成功
+        """
+        return await asyncio.to_thread(self.firebase_service.update_array_field, collection, document_id, field, values,
+                                       operation)
+
     async def delete_document(self, collection: str, document_id: str) -> bool:
         """
         非同步刪除 Firestore 文檔
@@ -294,6 +316,42 @@ class AsyncFirebaseService:
             result[sub_coll] = sub_doc or {}
 
         return result
+
+        # === SugarAI：訊息用量寫入 ===
+    async def upsert_channel_message_usage(
+        self,
+        channel_id: str,
+        message_id: str,
+        usage_payload: Dict[str, Any],
+        merge: bool = True,
+    ) -> bool:
+        """
+        將 LLM 用量寫入：
+        channels/{channelId}/messages/{messageId}
+
+        Args:
+            channel_id    : 頻道 ID
+            message_id    : 該次對話在 Stream Chat 的 message.id
+            usage_payload : 字典內容，例如
+                {
+                  "prompt_tokens": 139,
+                  "completion_tokens": 47,
+                  "total_tokens": 186,
+                  "costUSD": 0.00071
+                }
+            merge         : True=合併；False=覆蓋
+        """
+        # 加上伺服器時間戳
+        data = {**usage_payload, "createdAt": self.firebase_service.get_server_timestamp()}
+
+        # 呼叫同步版 set_document
+        return await asyncio.to_thread(
+            self.firebase_service.set_document,
+            f"channels/{channel_id}/messages",  # ← 直接傳路徑
+            message_id,
+            data,
+            merge,
+        )
 
     def get_server_timestamp(self):
         """

@@ -194,3 +194,10 @@ messages.json
 server.py
 .vscode/Plugin Skeleton.code-snippets
 config/sugarAI_Firebase_Admin_SDK.json
+auto/firebase_level_generator.py
+auto/ai_character_uploader.py
+auto/templates/ai_character_form.html
+plugins/stream_chat_plugin/orchestrator/chat_orchestrator.py
+.gitignore
+.gitignore
+server.py

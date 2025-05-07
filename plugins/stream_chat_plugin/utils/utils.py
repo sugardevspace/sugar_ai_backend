@@ -37,6 +37,47 @@ def get_next_level_title(levels: Dict[str, Dict[str, Any]], total_intimacy: int)
     return highest_level[2]
 
 
+def collect_usage(result: Any) -> Dict[str, Any]:
+    """
+    擷取 model 及 usage，若缺則全部給預設值。
+    """
+    if isinstance(result, dict) and result.get("usage"):
+        u = result["usage"]
+        return {
+            "model": result.get("model", "unknown"),
+            "prompt_tokens": u.get("prompt_tokens", 0),
+            "completion_tokens": u.get("completion_tokens", 0),
+            "total_tokens": u.get("total_tokens", 0),
+        }
+    # 回傳全 0，model 設 unknown
+    return {
+        "model": "unknown",
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    }
+
+
+def aggregate_usage(*usages: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    將多筆 usage 相加，假設 model 都相同 → 取第一筆 model。
+    """
+    if not usages:
+        return {}
+
+    model_name = usages[0]["model"]  # 全部請求同一個 model
+    total_prompt = sum(u["prompt_tokens"] for u in usages)
+    total_completion = sum(u["completion_tokens"] for u in usages)
+    total_tokens = total_prompt + total_completion
+
+    return {
+        "model": model_name,
+        "prompt_tokens": total_prompt,
+        "completion_tokens": total_completion,
+        "total_tokens": total_tokens,
+    }
+
+
 # def get_prompt_by_intimacy(levels: Dict[str, Dict[str, Any]], total_intimacy: int) -> str:
 #     """
 #     根據總親密度 total_intimacy，在角色 levels 中找出對應等級的 scene_prompt

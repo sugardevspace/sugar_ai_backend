@@ -1,14 +1,14 @@
 import asyncio
 import copy
 import traceback
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 from core.models.llm_model import ChatRequest
 from services.async_firebase_service import AsyncFirebaseService
 from services.async_stream_chat_service import AsyncStreamChatService
 from services.async_llm_service import AsyncLLMService, LLMRequestError
 from services.chat_cache_service import ChatCacheService
-from ..utils import get_current_level_title, get_next_level_title
+from ..utils import get_current_level_title, get_next_level_title, aggregate_usage, collect_usage
 from ..utils import FetchCacheService
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -45,7 +45,10 @@ class ChatOrchestrator:
     ) -> Dict[str, Any]:
         """生成對用戶輸入的 AI 回應"""
         prompt_context = await self._get_complete_prompt_context(user_id, channel_id, character_id, current_message)
+        self.logger.debug("prompt_context成功")
+        self.logger.debug(prompt_context)
         llm_messages = await self._format_prompt_for_llm(prompt_context, chat_mode, reply_word, lockedLevel)
+        self.logger.debug("llm_message成功")
         response_format = self._get_response_model_for_mode(chat_mode)
 
         intimacy_messages = await self._format_intimacy_prompt(prompt_context)
@@ -58,40 +61,40 @@ class ChatOrchestrator:
         model = self._select_model_for_chat_mode(chat_mode)
 
         try:
-            if (response_format == "level"):
-                request_response = await self.llm_service.send_chat_request(
-                    ChatRequest(model=model, messages=llm_messages, response_format=response_format))
 
-                request_id = request_response.get("request_id")
-                llm_result = await self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1)
-            else:
+            # 發送兩個請求：主要對話 & 親密度
+            tasks = await asyncio.gather(
+                self.llm_service.send_chat_request(
+                    ChatRequest(model=model, messages=llm_messages, response_format=response_format)),
+                self.llm_service.send_chat_request(
+                    ChatRequest(model=model, messages=intimacy_messages, response_format=intimacy_response_format)),
+                self.llm_service.send_chat_request(
+                    ChatRequest(model=model,
+                                messages=user_persona_messages,
+                                response_format=user_persona_response_format)),
+            )
+            request_response, intimacy_response, user_persona_response = tasks
 
-                # 發送兩個請求：主要對話 & 親密度
-                tasks = await asyncio.gather(
-                    self.llm_service.send_chat_request(
-                        ChatRequest(model=model, messages=llm_messages, response_format=response_format)),
-                    self.llm_service.send_chat_request(
-                        ChatRequest(model=model, messages=intimacy_messages, response_format=intimacy_response_format)),
-                    self.llm_service.send_chat_request(
-                        ChatRequest(model=model,
-                                    messages=user_persona_messages,
-                                    response_format=user_persona_response_format)),
-                )
-                request_response, intimacy_response, user_persona_response = tasks
+            request_id = request_response.get("request_id")
+            intimacy_id = intimacy_response.get("request_id")
+            user_persona_id = user_persona_response.get("request_id")
 
-                request_id = request_response.get("request_id")
-                intimacy_id = intimacy_response.get("request_id")
-                user_persona_id = user_persona_response.get("request_id")
+            if not request_id or not intimacy_id:
+                raise LLMRequestError("無法獲取請求 ID")
 
-                if not request_id or not intimacy_id:
-                    raise LLMRequestError("無法獲取請求 ID")
+            # 等待結果
+            llm_result, intimacy_result, user_persona_result = await asyncio.gather(
+                self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1),
+                self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1),
+                self.llm_service.wait_for_completion(user_persona_id, max_wait_time=180, check_interval=1),
+                return_exceptions=True)
 
-                # 等待結果
-                llm_result, intimacy_result, user_persona_result = await asyncio.gather(
-                    self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1),
-                    self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1),
-                    self.llm_service.wait_for_completion(user_persona_id, max_wait_time=180, check_interval=1),
-                    return_exceptions=True)
+            # 計算成本
+            usage_llm = collect_usage(llm_result)
+            usage_intimacy = collect_usage(intimacy_result)
+            usage_user_persona = collect_usage(user_persona_result)
+            total_usage = aggregate_usage(usage_llm, usage_intimacy, usage_user_persona)
+            total_usage["chat_mode"] = self._get_chat_mode(chat_mode)
 
             structured_output = llm_result.get("structured_output", {})
             response_type = llm_result.get("response_format_type", "")
@@ -101,7 +104,7 @@ class ChatOrchestrator:
             messages = []
 
             # 根據 response_type 處理格式
-            if response_type in ["story", "stimulation", "level"]:
+            if response_type in ["story", "stimulation"]:
                 dialogues = structured_output.get("dialogues", [])
                 for item in dialogues:
                     msg = item.get("message", "").strip()
@@ -124,10 +127,7 @@ class ChatOrchestrator:
                 await self._update_user_persona(user_id, channel_id, user_persona_result)
 
             # 回傳格式為純文字，將多句話合併
-            return {
-                "text": "".join(messages),
-                "response_type": response_type,
-            }
+            return {"text": "".join(messages), "response_type": response_type, "usage": total_usage}
 
         except Exception as e:
             self.logger.error(f"生成 LLM 回應時發生錯誤: {e}")
@@ -214,36 +214,68 @@ class ChatOrchestrator:
         """
         根據不同模式與字數產生不同的內容
         """
-        character_info = prompt_context["character_system_prompt"]
-        character_levels = prompt_context["levels"]
-        chat_mode_en = self._get_chat_mode(chat_mode)
+        try:
+            character_info = prompt_context["character_system_prompt"]
+            character_levels = prompt_context["levels"]
+            chat_mode_en = self._get_chat_mode(chat_mode)
 
-        intimacy_level = prompt_context["meta_data"]["current_level"]
-        taipei_tz = ZoneInfo("Asia/Taipei")
-        now_in_taipei = datetime.now(taipei_tz)
+            intimacy_level = prompt_context["meta_data"]["current_level"]
+            taipei_tz = ZoneInfo("Asia/Taipei")
+            now_in_taipei = datetime.now(taipei_tz)
 
-        character_info = (f'{character_info["generalPrompt"]}，'
-                          f'目前所處場景：{character_levels[lockedLevel]['scenePrompt']}'
-                          f'目前時間：{now_in_taipei}'
-                          f'生成回覆字數{character_info["replyWord"][reply_word]}，'
-                          f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
-                          f'生成回覆字數{character_info["replyWord"][reply_word]}，'
-                          f'{character_info["uniqueSpecialty"]}，基本身份：{character_info["basicIdentity"]}，'
-                          f'語氣風格：{character_info["toneStyle"][intimacy_level]}，'
-                          f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
-                          f'口頭禪：{character_info["mantra"]}，'
-                          f'喜好與厭惡：{character_info["likeDislike"]}，'
-                          f'家庭背景：{character_info["familyBackground"]}，'
-                          f'重要角色：{character_info["importantRole"]}，'
-                          f'外貌：{character_info["appearance"]}')
+            # 輸出偵錯信息
+            self.logger.debug(f"chat_mode: {chat_mode}, reply_word: {reply_word}, lockedLevel: {lockedLevel}")
+            self.logger.debug(f"可用的levels keys: {list(character_levels.keys())}")
 
-        messages = [{"role": "system", "content": character_info}]
-        # 加入歷史對話（已經標好 role）
-        messages += prompt_context["messages"]["chat_history"]
-        # 加入本次 user 請求
-        messages.append({"role": "user", "content": prompt_context["messages"]["current_message"]})
-        self.logger.debug(messages)
-        return messages
+            # 檢查 lockedLevel 是否為字串，如果不是則轉換
+            if not isinstance(lockedLevel, str):
+                lockedLevel = str(lockedLevel)
+                self.logger.debug(f"lockedLevel 已轉換為字串: {lockedLevel}")
+
+            # 檢查 lockedLevel 是否存在於 character_levels
+            if lockedLevel not in character_levels:
+                self.logger.error(f"錯誤: lockedLevel={lockedLevel} 不在 character_levels 中")
+                self.logger.error(f"可用的 levels: {list(character_levels.keys())}")
+                # 使用默認值或拋出異常
+                raise KeyError(f"lockedLevel={lockedLevel} 不在 character_levels 中")
+
+            # 檢查 scenePrompt 是否存在
+            if 'scenePrompt' not in character_levels[lockedLevel]:
+                self.logger.error(f"錯誤: scenePrompt 不在 character_levels[{lockedLevel}] 中")
+                self.logger.error(f"可用的欄位: {list(character_levels[lockedLevel].keys())}")
+                # 使用空字串作為默認值
+                scene_prompt = ""
+            else:
+                scene_prompt = character_levels[lockedLevel]['scenePrompt']
+
+            character_info = (f'{character_info["generalPrompt"]}，'
+                              f'目前所處場景：{scene_prompt}'
+                              f'目前時間：{now_in_taipei}'
+                              f'生成回覆字數{character_info["replyWord"][reply_word]}，'
+                              f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
+                              f'生成回覆字數{character_info["replyWord"][reply_word]}，'
+                              f'{character_info["uniqueSpecialty"]}，基本身份：{character_info["basicIdentity"]}，'
+                              f'語氣風格：{character_info["toneStyle"][intimacy_level]}，'
+                              f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
+                              f'口頭禪：{character_info["mantra"]}，'
+                              f'喜好與厭惡：{character_info["likeDislike"]}，'
+                              f'家庭背景：{character_info["familyBackground"]}，'
+                              f'重要角色：{character_info["importantRole"]}，'
+                              f'外貌：{character_info["appearance"]}')
+
+            messages = [{"role": "system", "content": character_info}]
+            # 加入歷史對話（已經標好 role）
+            messages += prompt_context["messages"]["chat_history"]
+            # 加入本次 user 請求
+            messages.append({"role": "user", "content": prompt_context["messages"]["current_message"]})
+            self.logger.debug(messages)
+            return messages
+        except Exception as e:
+            self.logger.error(f"格式化提示時出錯: {str(e)}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+            # 可以选择重新抛出异常或返回默认值
+            raise
 
     def _get_chat_mode(self, chat_mode: str) -> str:
         mode_map = {"小說": "story", "故事": "story", "簡訊": "text", "刺激": "NSFW", "關卡": "level"}
@@ -555,32 +587,50 @@ class ChatOrchestrator:
 
                 # 如果新的等級比原本大，就更新 lock_level
                 if level_num > old_lock_level:
-                    self.chat_cache_service.update_channel_data_field(user_id, channel_id, "meta_data.lock_level",
-                                                                      level_num)
+                    new_card = self.get_card_id(levels, level_num, character_id)
+
+                    if new_card is not None:
+                        self.logger.info(f"開始更新用戶卡片收集，新卡片ID: {new_card}")
+
+                        try:
+                            # 第一步：更新卡片收藏
+                            update_result = await self.firebase_service.update_array_field(
+                                "user_card_collections", user_id, "collectedCardIds", [new_card])
+
+                            self.logger.info(f"卡片更新完成，結果: {update_result}")
+
+                            # 可以添加結果驗證 (如果 update_array_field 返回結果)
+                            # if not update_result.success:
+                            #     self.logger.warning(f"卡片更新可能未成功: {update_result}")
+
+                        except Exception as card_err:
+                            self.logger.error(f"更新卡片時發生錯誤: {card_err}")
+                            # 這裡可以決定是否繼續更新頻道數據
+                            # 如果卡片更新失敗但我們仍想繼續更新頻道，就不要 raise
+
                     self.logger.info(f"解鎖新關卡: {level_num}（原本: {old_lock_level}）")
                 else:
                     level_num = old_lock_level
                     self.logger.info(f"已達最高解鎖關卡: {old_lock_level}")
 
-            else:
-                self.logger.warning(f"找不到對應的 level_key 或格式錯誤: {level_key}")
-
-            new_meta = {
-                "meta_data": {
-                    "intimacy": intimacy,
-                    "total_intimacy": total_intimacy,
-                    "current_level": current_level,
-                    "next_level": next_level,
-                    "intimacy_percentage": intimacy_percentage,
-                    "lock_level": level_num
+                # 準備新的元數據
+                new_meta = {
+                    "meta_data": {
+                        "intimacy": intimacy,
+                        "total_intimacy": total_intimacy,
+                        "current_level": current_level,
+                        "next_level": next_level,
+                        "intimacy_percentage": intimacy_percentage,
+                        "lock_level": level_num
+                    }
                 }
-            }
 
-            # 一次更新 cache 與 Firestore
-            await self.fetch_cache_service.update_and_cache_channel_data(user_id=user_id,
-                                                                         channel_id=channel_id,
-                                                                         new_data=new_meta)
-            self.logger.info("已使用 update_and_cache_channel_data 同步更新 meta_data")
+                # 第二步：更新頻道數據
+                self.logger.info(f"開始更新頻道數據: {new_meta}")
+                await self.fetch_cache_service.update_and_cache_channel_data(user_id=user_id,
+                                                                             channel_id=channel_id,
+                                                                             new_data=new_meta)
+                self.logger.info("頻道數據更新完成")
         except Exception as e:
             self.logger.error(f"更新meta數據時發生錯誤: {e}")
             self.logger.error(traceback.format_exc())
@@ -635,3 +685,39 @@ class ChatOrchestrator:
             merged[key] = old_items
 
         return merged
+
+    def get_card_id(self, levels: dict, level_num: str, character_id: str) -> Optional[str]:
+        """
+        取得角色特定等級的卡片 ID，格式為 '{character_id}-{level_num}'
+        若該等級存在 hasCard 欄位且為 True，則回傳卡片 ID
+        
+        參數:
+            levels: 包含所有等級資訊的字典
+            level_num: 要檢查的等級編號字串 (如 "1", "2" 等)
+            character_id: 聊天頻道 ID
+        
+        返回:
+            Optional[str]: 卡片 ID 或 None (如果沒有卡片)
+        """
+        self.logger.warning(f"levels：{levels}")
+        try:
+            # 檢查等級是否存在
+            level_num = str(level_num)
+            if level_num not in levels:
+                self.logger.warning(f"等級 {level_num} 不存在")
+                return None
+
+            # 獲取該等級資訊
+            level_info = levels[level_num]
+
+            # 檢查 hasCard 欄位是否存在且為 True
+            has_card = level_info.get("hasCard", False)
+
+            if has_card:
+                # 格式化卡片 ID
+                return f"{character_id}-card-{level_num}"
+            else:
+                return None
+        except Exception as e:
+            self.logger.error(f"獲取卡片 ID 時發生錯誤: {e}")
+            return None

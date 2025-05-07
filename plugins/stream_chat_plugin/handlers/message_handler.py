@@ -44,6 +44,7 @@ class AsyncMessageHandler:
         chat_mode = message.get("chatMode", "故事")
         reply_word = message.get("responseLength", "10")
         lockedLevel = message.get("lockedLevel", "1")
+        ticket_cost = message.get("cost", "0")
         members = event_data.get("members", [])
 
         character_id = get_character_id(members=members)
@@ -85,6 +86,16 @@ class AsyncMessageHandler:
                 reply_word=reply_word,
                 lockedLevel=lockedLevel,
             )
+
+            usage = response.get("usage")
+            usage["ticket_cost"] = ticket_cost
+            if usage:
+                # ❷ 寫入 Firestore
+                await self.firebase_service.upsert_channel_message_usage(
+                    channel_id=channel_id,
+                    message_id=message_id,
+                    usage_payload=usage,
+                )
 
             return {
                 "status": "success",
