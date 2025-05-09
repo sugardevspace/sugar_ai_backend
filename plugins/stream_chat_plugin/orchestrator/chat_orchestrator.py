@@ -82,12 +82,22 @@ class ChatOrchestrator:
             if not request_id or not intimacy_id:
                 raise LLMRequestError("無法獲取請求 ID")
 
-            # 等待結果
+            stop_typing_event = asyncio.Event()
+
+            # 啟動 typing 任務（在背景執行）
+            typing_task = asyncio.create_task(
+                self.maintain_typing(channel_id, character_id, interval=5, stop_event=stop_typing_event))
+
+            # 等待 LLM 三個任務
             llm_result, intimacy_result, user_persona_result = await asyncio.gather(
                 self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1),
                 self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1),
                 self.llm_service.wait_for_completion(user_persona_id, max_wait_time=180, check_interval=1),
                 return_exceptions=True)
+
+            # 停止 typing 任務
+            stop_typing_event.set()
+            await typing_task
 
             # 計算成本
             usage_llm = collect_usage(llm_result)
@@ -153,6 +163,17 @@ class ChatOrchestrator:
         }
 
         return self.RESPONSE_MODEL[chat_mode]
+
+    async def maintain_typing(self, channel_id, user_id, interval=5, stop_event=None):
+        try:
+            while not stop_event.is_set():
+                await self.stream_chat_service.send_event(channel_id=channel_id,
+                                                          event={"type": "typing.start"},
+                                                          user_id=user_id)
+                await asyncio.sleep(interval)
+        except Exception as e:
+            # 若有例外記錄但不中斷主邏輯
+            print(f"maintain_typing error: {e}")
 
     async def _get_complete_prompt_context(self, user_id: str, channel_id: str, character_id: str,
                                            current_message: str) -> Dict[str, Any]:

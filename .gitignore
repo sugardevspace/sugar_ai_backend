@@ -201,3 +201,8 @@ plugins/stream_chat_plugin/orchestrator/chat_orchestrator.py
 .gitignore
 .gitignore
 server.py
+.DS_Store
+auto/Dockerfile
+.vscode/settings.json
+server.py
+.DS_Store
