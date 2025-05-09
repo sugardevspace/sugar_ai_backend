@@ -45,10 +45,7 @@ class ChatOrchestrator:
     ) -> Dict[str, Any]:
         """生成對用戶輸入的 AI 回應"""
         prompt_context = await self._get_complete_prompt_context(user_id, channel_id, character_id, current_message)
-        self.logger.debug("prompt_context成功")
-        self.logger.debug(prompt_context)
         llm_messages = await self._format_prompt_for_llm(prompt_context, chat_mode, reply_word, lockedLevel)
-        self.logger.debug("llm_message成功")
         response_format = self._get_response_model_for_mode(chat_mode)
 
         intimacy_messages = await self._format_intimacy_prompt(prompt_context)
@@ -156,7 +153,7 @@ class ChatOrchestrator:
         self.RESPONSE_MODEL = {
             "小說": "story",
             "簡訊": "text",
-            "刺激": "stimulation",
+            "開車": "stimulation",
             "親密度": "intimacy",
             "關卡": "level",
             "user_persona": "user_persona"
@@ -269,27 +266,44 @@ class ChatOrchestrator:
             else:
                 scene_prompt = character_levels[lockedLevel]['scenePrompt']
 
-            character_info = (f'{character_info["generalPrompt"]}，'
-                              f'目前所處場景：{scene_prompt}'
-                              f'目前時間：{now_in_taipei}'
-                              f'生成回覆字數{character_info["replyWord"][reply_word]}，'
-                              f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
-                              f'生成回覆字數{character_info["replyWord"][reply_word]}，'
-                              f'{character_info["uniqueSpecialty"]}，基本身份：{character_info["basicIdentity"]}，'
-                              f'語氣風格：{character_info["toneStyle"][intimacy_level]}，'
-                              f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
-                              f'口頭禪：{character_info["mantra"]}，'
-                              f'喜好與厭惡：{character_info["likeDislike"]}，'
-                              f'家庭背景：{character_info["familyBackground"]}，'
-                              f'重要角色：{character_info["importantRole"]}，'
-                              f'外貌：{character_info["appearance"]}')
+            if chat_mode_en == 'NSFW':
+                character_info = (f'{character_info["generalPromptNSFW"]}，'
+                                  f'目前所處場景：{scene_prompt}'
+                                  f'外貌：{character_info["appearance"]}'
+                                  f'生成回覆字數{character_info["replyWord"][reply_word]}，'
+                                  f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
+                                  f'生成回覆字數{character_info["replyWord"][reply_word]}，'
+                                  f'{character_info["uniqueSpecialty"]}，基本身份：{character_info["basicIdentity"]}，'
+                                  f'語氣風格：{character_info["toneStyle"][intimacy_level]}，'
+                                  f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
+                                  f'口頭禪：{character_info["mantra"]}，'
+                                  f'喜好與厭惡：{character_info["likeDislike"]}，'
+                                  f'家庭背景：{character_info["familyBackground"]}，'
+                                  f'重要角色：{character_info["importantRole"]}，'
+                                  f'目前時間：{now_in_taipei}')
+            else:
+
+                character_info = (f'{character_info["generalPrompt"]}，'
+                                  f'目前所處場景：{scene_prompt}'
+                                  f'目前時間：{now_in_taipei}'
+                                  f'生成回覆字數{character_info["replyWord"][reply_word]}，'
+                                  f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
+                                  f'生成回覆字數{character_info["replyWord"][reply_word]}，'
+                                  f'{character_info["uniqueSpecialty"]}，基本身份：{character_info["basicIdentity"]}，'
+                                  f'語氣風格：{character_info["toneStyle"][intimacy_level]}，'
+                                  f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
+                                  f'口頭禪：{character_info["mantra"]}，'
+                                  f'喜好與厭惡：{character_info["likeDislike"]}，'
+                                  f'家庭背景：{character_info["familyBackground"]}，'
+                                  f'重要角色：{character_info["importantRole"]}，'
+                                  f'外貌：{character_info["appearance"]}')
 
             messages = [{"role": "system", "content": character_info}]
             # 加入歷史對話（已經標好 role）
             messages += prompt_context["messages"]["chat_history"]
             # 加入本次 user 請求
             messages.append({"role": "user", "content": prompt_context["messages"]["current_message"]})
-            self.logger.debug(messages)
+            self.logger.debug(f"prompt_LLM:{messages}")
             return messages
         except Exception as e:
             self.logger.error(f"格式化提示時出錯: {str(e)}")
@@ -299,7 +313,7 @@ class ChatOrchestrator:
             raise
 
     def _get_chat_mode(self, chat_mode: str) -> str:
-        mode_map = {"小說": "story", "故事": "story", "簡訊": "text", "刺激": "NSFW", "關卡": "level"}
+        mode_map = {"小說": "story", "故事": "story", "簡訊": "text", "開車": "NSFW", "關卡": "level"}
         # 用傳入的 chat_mode 去查 map，而不是把 map 當 key
         return mode_map.get(chat_mode, "story")
 
@@ -307,7 +321,7 @@ class ChatOrchestrator:
         """
         根據聊天模式選擇對應的 LLM 模型
         """
-        return {"小說": None, "簡訊": None, "刺激": None, "親密度": None}.get(chat_mode, "default model")
+        return {"小說": None, "簡訊": None, "開車": "grok-3", "親密度": None}.get(chat_mode, "default model")
 
     async def _format_story_prompt(self, prompt_context: Dict[str, Any]) -> List[Dict[str, str]]:
         # 將消息列表轉換為字符串
