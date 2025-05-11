@@ -53,7 +53,7 @@ class ChatOrchestrator:
 
         user_persona_messages = await self._format_user_persona_prompt(prompt_context)
         self.logger.debug(f"使用者 persona：{user_persona_messages}")
-        user_persona_response_format = self._get_response_model_for_mode("user_persona")
+        # user_persona_response_format = self._get_response_model_for_mode("user_persona")
 
         model = self._select_model_for_chat_mode(chat_mode)
 
@@ -65,16 +65,16 @@ class ChatOrchestrator:
                     ChatRequest(model=model, messages=llm_messages, response_format=response_format)),
                 self.llm_service.send_chat_request(
                     ChatRequest(model=model, messages=intimacy_messages, response_format=intimacy_response_format)),
-                self.llm_service.send_chat_request(
-                    ChatRequest(model=model,
-                                messages=user_persona_messages,
-                                response_format=user_persona_response_format)),
+                # self.llm_service.send_chat_request(
+                #     ChatRequest(model=model,
+                #                 messages=user_persona_messages,
+                #                 response_format=user_persona_response_format)),
             )
-            request_response, intimacy_response, user_persona_response = tasks
+            request_response, intimacy_response = tasks
 
             request_id = request_response.get("request_id")
             intimacy_id = intimacy_response.get("request_id")
-            user_persona_id = user_persona_response.get("request_id")
+            # user_persona_id = user_persona_response.get("request_id")
 
             if not request_id or not intimacy_id:
                 raise LLMRequestError("無法獲取請求 ID")
@@ -86,10 +86,10 @@ class ChatOrchestrator:
                 self.maintain_typing(channel_id, character_id, interval=5, stop_event=stop_typing_event))
 
             # 等待 LLM 三個任務
-            llm_result, intimacy_result, user_persona_result = await asyncio.gather(
+            llm_result, intimacy_result = await asyncio.gather(
                 self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1),
                 self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1),
-                self.llm_service.wait_for_completion(user_persona_id, max_wait_time=180, check_interval=1),
+                # self.llm_service.wait_for_completion(user_persona_id, max_wait_time=180, check_interval=1),
                 return_exceptions=True)
 
             # 停止 typing 任務
@@ -99,8 +99,8 @@ class ChatOrchestrator:
             # 計算成本
             usage_llm = collect_usage(llm_result)
             usage_intimacy = collect_usage(intimacy_result)
-            usage_user_persona = collect_usage(user_persona_result)
-            total_usage = aggregate_usage(usage_llm, usage_intimacy, usage_user_persona)
+            # usage_user_persona = collect_usage(user_persona_result)
+            total_usage = aggregate_usage(usage_llm, usage_intimacy)
             total_usage["chat_mode"] = chat_mode
 
             structured_output = llm_result.get("structured_output", {})
@@ -131,7 +131,7 @@ class ChatOrchestrator:
             # 更新 meta
             if (chat_mode != "關卡"):
                 await self._update_meta_data(user_id, channel_id, character_id, intimacy_result)
-                await self._update_user_persona(user_id, channel_id, user_persona_result)
+                # await self._update_user_persona(user_id, channel_id, user_persona_result)
 
             # 回傳格式為純文字，將多句話合併
             return {"text": "".join(messages), "response_type": response_type, "usage": total_usage}
