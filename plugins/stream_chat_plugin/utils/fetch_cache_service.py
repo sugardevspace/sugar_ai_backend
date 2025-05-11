@@ -9,7 +9,7 @@ class FetchCacheService:
     """
     負責通用的 fetch + cache 流程管理。
     """
-    MAX_MESSAGES = 30
+    MAX_MESSAGES = 20
 
     def __init__(self, firebase_service: AsyncFirebaseService, chat_cache_service: ChatCacheService,
                  stream_chat_service: AsyncStreamChatService, logger: logging.Logger):

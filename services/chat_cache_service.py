@@ -9,7 +9,7 @@ class ChatCacheService:
 
     # 快取容量和過期時間常量
     MAX_CACHE_SIZE = 1000  # 用戶-頻道組合的最大數量
-    MAX_MESSAGES = 30  # 每個頻道的最大訊息數
+    MAX_MESSAGES = 20  # 每個頻道的最大訊息數
     TTL_SECONDS = 21600  # 快取過期時間（6小時 = 6*60*60 = 21600秒）
     PROCESSED_REQUEST_TTL = 300  # 5分鐘內不重複處理同一 request_id
 

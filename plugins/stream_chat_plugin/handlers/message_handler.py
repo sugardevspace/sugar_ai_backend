@@ -49,6 +49,8 @@ class AsyncMessageHandler:
 
         character_id = get_character_id(members=members)
         message_id = message.get("id")
+        ai_name = self.get_ai_character_name(event_data.get("members", []))
+        print(f"這次的角色是：{ai_name}")
 
         # 防重機制
         if self.chat_cache_service.has_processed_message(sender_id, channel_id, message_id):
@@ -88,11 +90,17 @@ class AsyncMessageHandler:
             )
 
             usage = response.get("usage")
-            usage["ticket_cost"] = ticket_cost
+            usage["ticket_cost"] = int(ticket_cost)
+            usage["character"] = ai_name
             if usage:
-                # ❷ 寫入 Firestore
+                # 寫入 Firestore
                 await self.firebase_service.upsert_channel_message_usage(
                     channel_id=channel_id,
+                    message_id=message_id,
+                    usage_payload=usage,
+                )
+                await self.firebase_service.upsert_user_spend_logs(
+                    user_id=sender_id,
                     message_id=message_id,
                     usage_payload=usage,
                 )
@@ -104,3 +112,11 @@ class AsyncMessageHandler:
                 "response": response,
                 "processed": True
             }
+
+    def get_ai_character_name(self, members: list) -> str:
+        for member in members:
+            user_id = member.get("user_id", "")
+            if user_id.startswith("ai-"):
+                user = member.get("user", {})
+                return user.get("name", "")
+        return ""

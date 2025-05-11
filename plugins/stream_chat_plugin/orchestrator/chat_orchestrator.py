@@ -101,7 +101,7 @@ class ChatOrchestrator:
             usage_intimacy = collect_usage(intimacy_result)
             usage_user_persona = collect_usage(user_persona_result)
             total_usage = aggregate_usage(usage_llm, usage_intimacy, usage_user_persona)
-            total_usage["chat_mode"] = self._get_chat_mode(chat_mode)
+            total_usage["chat_mode"] = chat_mode
 
             structured_output = llm_result.get("structured_output", {})
             response_type = llm_result.get("response_format_type", "")
@@ -269,7 +269,7 @@ class ChatOrchestrator:
             if chat_mode_en == 'NSFW':
                 character_info = (f'{character_info["generalPromptNSFW"]}，'
                                   f'目前所處場景：{scene_prompt}'
-                                  f'外貌：{character_info["appearance"]}'
+                                  f'外貌：{character_info["appearanceNSFW"]}'
                                   f'生成回覆字數{character_info["replyWord"][reply_word]}，'
                                   f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
                                   f'生成回覆字數{character_info["replyWord"][reply_word]}，'
@@ -280,7 +280,9 @@ class ChatOrchestrator:
                                   f'喜好與厭惡：{character_info["likeDislike"]}，'
                                   f'家庭背景：{character_info["familyBackground"]}，'
                                   f'重要角色：{character_info["importantRole"]}，'
-                                  f'目前時間：{now_in_taipei}')
+                                  f'目前時間：{now_in_taipei}'
+                                  f'其他重要資訊：{character_info["others"]}，')
+
             else:
 
                 character_info = (f'{character_info["generalPrompt"]}，'
@@ -296,7 +298,8 @@ class ChatOrchestrator:
                                   f'喜好與厭惡：{character_info["likeDislike"]}，'
                                   f'家庭背景：{character_info["familyBackground"]}，'
                                   f'重要角色：{character_info["importantRole"]}，'
-                                  f'外貌：{character_info["appearance"]}')
+                                  f'外貌：{character_info["appearance"]}'
+                                  f'其他重要資訊：{character_info["others"]}，')
 
             messages = [{"role": "system", "content": character_info}]
             # 加入歷史對話（已經標好 role）

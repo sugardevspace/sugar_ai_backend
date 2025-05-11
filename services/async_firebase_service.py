@@ -353,6 +353,41 @@ class AsyncFirebaseService:
             merge,
         )
 
+    async def upsert_user_spend_logs(
+        self,
+        user_id: str,
+        message_id: str,
+        usage_payload: Dict[str, Any],
+        merge: bool = True,
+    ) -> bool:
+        """
+        將 LLM 用量寫入：
+        channels/{channelId}/messages/{messageId}
+
+        Args:
+            channel_id    : 頻道 ID
+            message_id    : 該次對話在 Stream Chat 的 message.id
+            usage_payload : 字典內容，例如
+                {
+                  "prompt_tokens": 139,
+                  "completion_tokens": 47,
+                  "total_tokens": 186,
+                  "costUSD": 0.00071
+                }
+            merge         : True=合併；False=覆蓋
+        """
+        # 加上伺服器時間戳
+        data = {**usage_payload, "createdAt": self.firebase_service.get_server_timestamp()}
+
+        # 呼叫同步版 set_document
+        return await asyncio.to_thread(
+            self.firebase_service.set_document,
+            f"users/{user_id}/spend_logs",  # ← 直接傳路徑
+            message_id,
+            data,
+            merge,
+        )
+
     def get_server_timestamp(self):
         """
         獲取 Firestore 服務器時間戳
