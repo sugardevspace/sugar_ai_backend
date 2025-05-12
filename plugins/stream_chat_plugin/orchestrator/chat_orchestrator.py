@@ -281,7 +281,7 @@ class ChatOrchestrator:
                                   f'家庭背景：{character_info["familyBackground"]}，'
                                   f'重要角色：{character_info["importantRole"]}，'
                                   f'目前時間：{now_in_taipei}'
-                                  f'其他重要資訊：{character_info["others"]}，')
+                                  f'其他重要資訊：{character_info.get("others", "")}，')
 
             else:
 
@@ -299,7 +299,7 @@ class ChatOrchestrator:
                                   f'家庭背景：{character_info["familyBackground"]}，'
                                   f'重要角色：{character_info["importantRole"]}，'
                                   f'外貌：{character_info["appearance"]}'
-                                  f'其他重要資訊：{character_info["others"]}，')
+                                  f'其他重要資訊：{character_info.get("others", "")}，')
 
             messages = [{"role": "system", "content": character_info}]
             # 加入歷史對話（已經標好 role）
