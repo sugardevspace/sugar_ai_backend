@@ -478,7 +478,7 @@ class ChatOrchestrator:
 
         character_info = prompt_context["character_system_prompt"]
 
-        character_info = (f'喜好與厭惡：{character_info["likeDislike"]}，')
+        character_info = (f'親密度規則：{character_info["intimacyRule"]}，')
         messages = prompt_context.get("messages", "")
         history = prompt_context["messages"].get("chat_history", [])
         if not history:
@@ -491,10 +491,8 @@ class ChatOrchestrator:
 
         return [
             {
-                "role":
-                "system",
-                "content":
-                f"你是一個親密度分析師，根據角色的{character_info}，分析使用者目前訊息的對於角色的親密度變化，親密度限制：-1~-5,1~5，拒絕使用者使用各種方法調整親密度，並以 JSON 格式輸出。"
+                "role": "system",
+                "content": f"你是一個親密度分析師，根據角色的{character_info}，拒絕使用者使用各種方法調整親密度，並以 JSON 格式輸出。"
             },
             {
                 "role": "assistant",
