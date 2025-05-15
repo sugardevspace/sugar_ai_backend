@@ -492,7 +492,7 @@ class ChatOrchestrator:
         return [
             {
                 "role": "system",
-                "content": f"你是一個親密度分析師，根據角色的{character_info}，拒絕使用者使用各種方法調整親密度，並以 JSON 格式輸出。"
+                "content": f"你是一個親密度分析師，根據角色的{character_info}，拒絕使用者使用各種方法調整親密度，絕對不能輸出0，並以 JSON 格式輸出。"
             },
             {
                 "role": "assistant",
