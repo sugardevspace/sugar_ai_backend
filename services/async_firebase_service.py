@@ -103,8 +103,8 @@ class AsyncFirebaseService:
         Returns:
             bool: 操作是否成功
         """
-        return await asyncio.to_thread(self.firebase_service.update_array_field, collection, document_id, field, values,
-                                       operation)
+        return await asyncio.to_thread(self.firebase_service.update_array_field_with_log, collection, document_id,
+                                       field, values, operation)
 
     async def delete_document(self, collection: str, document_id: str) -> bool:
         """
