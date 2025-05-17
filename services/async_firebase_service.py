@@ -84,27 +84,27 @@ class AsyncFirebaseService:
         """
         return await asyncio.to_thread(self.firebase_service.update_document, collection, document_id, data)
 
-    async def update_array_field(self,
-                                 collection: str,
-                                 document_id: str,
-                                 field: str,
-                                 values: List[Any],
-                                 operation: str = "append") -> bool:
+    async def update_dict_field(self,
+                                collection: str,
+                                document_id: str,
+                                field: str,
+                                values: dict,
+                                operation: str = "update") -> bool:
         """
-        非同步更新文檔中的陣列欄位，可以追加或移除元素
+        非同步更新文檔中的字典欄位，可以新增或更新鍵值對
 
         Args:
             collection: 集合名稱
             document_id: 文檔 ID
-            field: 要更新的陣列欄位名稱
-            values: 要追加或移除的值列表
-            operation: 操作類型，"append" 表示追加, "remove" 表示移除
+            field: 要更新的字典欄位名稱
+            values: 要更新的鍵值對字典
+            operation: 操作類型，目前僅支援 "update"
 
         Returns:
             bool: 操作是否成功
         """
-        return await asyncio.to_thread(self.firebase_service.update_array_field_with_log, collection, document_id,
-                                       field, values, operation)
+        return await asyncio.to_thread(self.firebase_service.update_dict_field_with_log, collection, document_id, field,
+                                       values, operation)
 
     async def delete_document(self, collection: str, document_id: str) -> bool:
         """

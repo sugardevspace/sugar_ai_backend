@@ -625,18 +625,19 @@ class ChatOrchestrator:
                 if level_num > old_lock_level:
                     new_card = self.get_card_id(levels, level_num, character_id)
 
+                    # 修改後的卡片收集邏輯
                     if new_card is not None:
                         self.logger.info(f"開始更新用戶卡片收集，新卡片ID: {new_card}")
 
                         try:
-                            # 第一步：更新卡片收藏
-                            update_result = await self.firebase_service.update_array_field(
-                                "user_card_collections", user_id, "collectedCardIds", [new_card])
+                            # 使用新的更新方法來更新字典結構
+                            update_result = await self.firebase_service.update_dict_field(
+                                "user_card_collections", user_id, "collectedCardIdsDict", {new_card: True})
 
                             self.logger.info(f"卡片更新完成，結果: {update_result}")
 
-                            # 可以添加結果驗證 (如果 update_array_field 返回結果)
-                            # if not update_result.success:
+                            # 可以添加結果驗證 (如果 update_dict_field 返回結果)
+                            # if not update_result:
                             #     self.logger.warning(f"卡片更新可能未成功: {update_result}")
 
                         except Exception as card_err:

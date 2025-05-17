@@ -1,5 +1,4 @@
 # services/firebase_service.py
-from datetime import datetime
 import logging
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
@@ -160,36 +159,36 @@ class FirebaseService:
             self.logger.error(f"更新文檔失敗: {e}")
             return False
 
-    def update_array_field_with_log(self,
-                                    collection: str,
-                                    document_id: str,
-                                    field: str,
-                                    values: List[Any],
-                                    operation: str = "append") -> bool:
+    def update_dict_field_with_log(self,
+                                   collection: str,
+                                   document_id: str,
+                                   field: str,
+                                   values: dict,
+                                   operation: str = "update") -> bool:
         """
-        安全更新陣列欄位並記錄卡片取得時間（僅支援 append 操作）
+        安全更新字典欄位並使用伺服器時間記錄卡片取得時間
 
         參數:
             collection: 集合名稱
             document_id: 文檔 ID
-            field: 僅限 'collectedCardIds'
-            values: 要追加的卡片 ID（list）
-            operation: 僅支援 'append'
+            field: 僅限 'collectedCardIdsDict'
+            values: 要更新的字典，例如 {'card-id-1': True}
+            operation: 目前僅支援 'update'
 
         返回:
             bool: 操作是否成功
         """
 
         # 僅允許更新指定欄位
-        if field != "collectedCardIds":
-            self.logger.error(f"⚠️ 僅允許更新 collectedCardIds，收到: {field}")
+        if field != "collectedCardIdsDict":
+            self.logger.error(f"⚠️ 僅允許更新 collectedCardIdsDict，收到: {field}")
             return False
 
-        if not isinstance(values, list):
-            self.logger.error("❌ values 必須為 list")
+        if not isinstance(values, dict):
+            self.logger.error("❌ values 必須為 dict")
             return False
 
-        if operation != "append":
+        if operation != "update":
             self.logger.error(f"❌ 不支援的操作類型: {operation}")
             return False
 
@@ -199,20 +198,40 @@ class FirebaseService:
         try:
             doc_ref = self.db.collection(collection).document(document_id)
 
-            # 第一步：追加卡片 ID 至 collectedCardIds
-            doc_ref.update({field: firestore.ArrayUnion(values)})
+            # 檢查文檔是否存在，如果不存在則創建
+            doc = doc_ref.get()
+            if not doc.exists:
+                doc_ref.set({field: {}})
 
-            # 第二步：記錄每張卡片的取得時間（ISO 格式）
-            timestamp = datetime.utcnow().isoformat() + "Z"
-            log_updates = {f"collectedCardLog.{card_id}": timestamp for card_id in values}
+            # 更新操作
+            updates = {}
 
-            doc_ref.update(log_updates)
+            # 針對每個卡片ID更新字典
+            for card_id, value in values.items():
+                updates[f"{field}.{card_id}"] = value
 
-            self.logger.info(f"✅ 成功追加卡片並記錄時間: {values} at {timestamp}")
+                # 使用 Firebase 伺服器時間記錄卡片的取得時間
+                updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
+
+            # 執行更新
+            doc_ref.update(updates)
+
+            # 同時更新向後兼容性資料結構 (如果需要)
+            # 獲取當前文檔資料
+            current_data = doc_ref.get().to_dict()
+            if current_data and "collectedCardIds" in current_data:
+                # 獲取當前的 collectedCardIds 列表
+                current_ids = current_data.get("collectedCardIds", [])
+                # 只添加不在列表中的卡片 ID
+                ids_to_add = [card_id for card_id in values.keys() if card_id not in current_ids]
+                if ids_to_add:
+                    doc_ref.update({"collectedCardIds": firestore.ArrayUnion(ids_to_add)})
+
+            self.logger.info(f"✅ 成功更新卡片字典並記錄時間: {values}")
             return True
 
         except Exception as e:
-            self.logger.error(f"❌ 更新卡片與時間失敗: {e}")
+            self.logger.error(f"❌ 更新卡片字典與時間失敗: {e}")
             return False
 
     def delete_document(self, collection: str, document_id: str) -> bool:
