@@ -166,42 +166,44 @@ class FirebaseService:
                            values: List[Any],
                            operation: str = "append") -> bool:
         """
-        更新文檔中的陣列欄位，可以追加或移除元素
+        安全更新文檔中的陣列欄位，只允許 append 或 remove，不會覆蓋整筆文件
 
         參數:
             collection: 集合名稱
             document_id: 文檔 ID
-            field: 要更新的陣列欄位名稱
-            values: 要追加或移除的值列表
+            field: 陣列欄位名稱（預期為 collectedCardIds）
+            values: 要追加或移除的值（list）
             operation: 操作類型，"append" 表示追加, "remove" 表示移除
 
         返回:
             bool: 操作是否成功
         """
-        # 確保已初始化
+        # 僅允許操作這個欄位（防止誤操作其他欄位）
+        if field != "collectedCardIds":
+            self.logger.error(f"⚠️ 僅允許更新欄位 collectedCardIds，收到: {field}")
+            return False
+
+        if not isinstance(values, list):
+            self.logger.error("❌ values 必須是 list")
+            return False
+
+        if operation not in ["append"]:
+            self.logger.error(f"❌ 不支援的操作類型: {operation}")
+            return False
+
         if not self.initialized:
             self.initialize()
 
         try:
-            # 獲取文檔引用
             doc_ref = self.db.collection(collection).document(document_id)
 
-            # 根據操作類型選擇適當的陣列操作
             if operation == "append":
-                # 使用 array_union 添加元素 (僅添加不存在的元素)
                 doc_ref.update({field: firestore.ArrayUnion(values)})
-                self.logger.info(f"陣列欄位追加成功: {collection}/{document_id}/{field}")
-            elif operation == "remove":
-                # 使用 array_remove 移除元素
-                doc_ref.update({field: firestore.ArrayRemove(values)})
-                self.logger.info(f"陣列欄位移除成功: {collection}/{document_id}/{field}")
-            else:
-                self.logger.error(f"不支持的陣列操作: {operation}")
-                return False
+                self.logger.info(f"✅ 陣列欄位追加成功: {collection}/{document_id}/{field} += {values}")
 
             return True
         except Exception as e:
-            self.logger.error(f"更新陣列欄位失敗: {e}")
+            self.logger.error(f"❌ 更新陣列欄位失敗: {e}")
             return False
 
     def delete_document(self, collection: str, document_id: str) -> bool:
