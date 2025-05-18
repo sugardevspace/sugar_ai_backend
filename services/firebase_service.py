@@ -165,21 +165,6 @@ class FirebaseService:
                                    field: str,
                                    values: dict,
                                    operation: str = "update") -> bool:
-        """
-        安全更新字典欄位並使用伺服器時間記錄卡片取得時間
-
-        參數:
-            collection: 集合名稱
-            document_id: 文檔 ID
-            field: 僅限 'collectedCardIdsDict'
-            values: 要更新的字典，例如 {'card-id-1': True}
-            operation: 目前僅支援 'update'
-
-        返回:
-            bool: 操作是否成功
-        """
-
-        # 僅允許更新指定欄位
         if field != "collectedCardIdsDict":
             self.logger.error(f"⚠️ 僅允許更新 collectedCardIdsDict，收到: {field}")
             return False
@@ -198,40 +183,36 @@ class FirebaseService:
         try:
             doc_ref = self.db.collection(collection).document(document_id)
 
-            # 檢查文檔是否存在，如果不存在則創建
-            doc = doc_ref.get()
-            if not doc.exists:
-                doc_ref.set({field: {}})
+            def transaction_update(transaction):
+                snapshot = transaction.get(doc_ref)
 
-            # 更新操作
-            updates = {}
+                # 若不存在，初始化字典
+                if not snapshot.exists:
+                    transaction.set(doc_ref, {field: {}})
 
-            # 針對每個卡片ID更新字典
-            for card_id, value in values.items():
-                updates[f"{field}.{card_id}"] = value
+                updates = {}
 
-                # 使用 Firebase 伺服器時間記錄卡片的取得時間
-                updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
+                # 加入更新資料
+                for card_id, value in values.items():
+                    updates[f"{field}.{card_id}"] = value
+                    updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
 
-            # 執行更新
-            doc_ref.update(updates)
+                transaction.update(doc_ref, updates)
 
-            # 同時更新向後兼容性資料結構 (如果需要)
-            # 獲取當前文檔資料
-            current_data = doc_ref.get().to_dict()
-            if current_data and "collectedCardIds" in current_data:
-                # 獲取當前的 collectedCardIds 列表
-                current_ids = current_data.get("collectedCardIds", [])
-                # 只添加不在列表中的卡片 ID
-                ids_to_add = [card_id for card_id in values.keys() if card_id not in current_ids]
-                if ids_to_add:
-                    doc_ref.update({"collectedCardIds": firestore.ArrayUnion(ids_to_add)})
+                # 向後兼容欄位處理
+                current_data = snapshot.to_dict() or {}
+                if "collectedCardIds" in current_data:
+                    current_ids = current_data.get("collectedCardIds", [])
+                    ids_to_add = [card_id for card_id in values if card_id not in current_ids]
+                    if ids_to_add:
+                        transaction.update(doc_ref, {"collectedCardIds": firestore.ArrayUnion(ids_to_add)})
 
-            self.logger.info(f"✅ 成功更新卡片字典並記錄時間: {values}")
+            self.db.run_transaction(transaction_update)
+            self.logger.info(f"✅ 成功以 transaction 更新卡片: {values}")
             return True
 
         except Exception as e:
-            self.logger.error(f"❌ 更新卡片字典與時間失敗: {e}")
+            self.logger.error(f"❌ transaction 更新卡片失敗: {e}")
             return False
 
     def delete_document(self, collection: str, document_id: str) -> bool:
