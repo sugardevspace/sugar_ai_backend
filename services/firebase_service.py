@@ -165,6 +165,7 @@ class FirebaseService:
                                    field: str,
                                    values: dict,
                                    operation: str = "update") -> bool:
+        # 驗證參數
         if field != "collectedCardIdsDict":
             self.logger.error(f"⚠️ 僅允許更新 collectedCardIdsDict，收到: {field}")
             return False
@@ -186,33 +187,34 @@ class FirebaseService:
             def transaction_update(transaction):
                 snapshot = transaction.get(doc_ref)
 
-                # 若不存在，初始化字典
                 if not snapshot.exists:
-                    transaction.set(doc_ref, {field: {}})
+                    # 文件不存在：直接建立完整結構
+                    initial_dict = {}
+                    initial_log = {}
 
-                updates = {}
+                    # 加入所有要更新的值
+                    for card_id, value in values.items():
+                        initial_dict[card_id] = value
+                        initial_log[card_id] = firestore.SERVER_TIMESTAMP
 
-                # 加入更新資料
-                for card_id, value in values.items():
-                    updates[f"{field}.{card_id}"] = value
-                    updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
+                    # 一次性建立整個文件
+                    transaction.set(doc_ref, {field: initial_dict, "collectedCardLog": initial_log})
+                else:
+                    # 文件存在：使用點記法更新
+                    updates = {}
+                    for card_id, value in values.items():
+                        updates[f"{field}.{card_id}"] = value
+                        updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
 
-                transaction.update(doc_ref, updates)
+                    transaction.update(doc_ref, updates)
 
-                # 向後兼容欄位處理
-                current_data = snapshot.to_dict() or {}
-                if "collectedCardIds" in current_data:
-                    current_ids = current_data.get("collectedCardIds", [])
-                    ids_to_add = [card_id for card_id in values if card_id not in current_ids]
-                    if ids_to_add:
-                        transaction.update(doc_ref, {"collectedCardIds": firestore.ArrayUnion(ids_to_add)})
-
+            # 執行 transaction
             self.db.run_transaction(transaction_update)
-            self.logger.info(f"✅ 成功以 transaction 更新卡片: {values}")
+            self.logger.info(f"✅ 成功更新卡片字典: {values}")
             return True
 
         except Exception as e:
-            self.logger.error(f"❌ transaction 更新卡片失敗: {e}")
+            self.logger.error(f"❌ 更新卡片字典失敗: {e}")
             return False
 
     def delete_document(self, collection: str, document_id: str) -> bool:
