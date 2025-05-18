@@ -257,14 +257,14 @@ class ChatOrchestrator:
                 # 使用默認值或拋出異常
                 raise KeyError(f"lockedLevel={lockedLevel} 不在 character_levels 中")
 
-            # 檢查 scenePrompt 是否存在
-            if 'scenePrompt' not in character_levels[lockedLevel]:
-                self.logger.error(f"錯誤: scenePrompt 不在 character_levels[{lockedLevel}] 中")
+            # 檢查 sceneLocation 是否存在
+            if 'sceneLocation' not in character_levels[lockedLevel]:
+                self.logger.error(f"錯誤: sceneLocation 不在 character_levels[{lockedLevel}] 中")
                 self.logger.error(f"可用的欄位: {list(character_levels[lockedLevel].keys())}")
                 # 使用空字串作為默認值
                 scene_prompt = ""
             else:
-                scene_prompt = character_levels[lockedLevel]['scenePrompt']
+                scene_prompt = character_levels[lockedLevel]['sceneLocation']
 
             if chat_mode_en == 'NSFW':
                 character_info = (f'{character_info["generalPromptNSFW"]}，'
