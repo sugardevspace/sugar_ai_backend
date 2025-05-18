@@ -184,10 +184,11 @@ class FirebaseService:
         try:
             doc_ref = self.db.collection(collection).document(document_id)
 
-            # Firebase Admin SDK 的 transaction 用法
+            # Firebase Admin SDK 的正確 transaction 寫法
             @firestore.transactional
             def transaction_update(transaction):
-                snapshot = transaction.get(doc_ref)
+                # 在 Firebase Admin SDK 中，直接從 doc_ref 讀取
+                snapshot = doc_ref.get()  # 不是從 transaction.get()
 
                 if not snapshot.exists:
                     # 文件不存在：直接建立完整結構
@@ -210,7 +211,7 @@ class FirebaseService:
 
                     transaction.update(doc_ref, updates)
 
-            # 執行 transaction - Firebase Admin SDK 方式
+            # 執行 transaction
             transaction = self.db.transaction()
             transaction_update(transaction)
 
