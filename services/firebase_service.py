@@ -184,6 +184,8 @@ class FirebaseService:
         try:
             doc_ref = self.db.collection(collection).document(document_id)
 
+            # Firebase Admin SDK 的 transaction 用法
+            @firestore.transactional
             def transaction_update(transaction):
                 snapshot = transaction.get(doc_ref)
 
@@ -208,8 +210,10 @@ class FirebaseService:
 
                     transaction.update(doc_ref, updates)
 
-            # 執行 transaction
-            self.db.run_transaction(transaction_update)
+            # 執行 transaction - Firebase Admin SDK 方式
+            transaction = self.db.transaction()
+            transaction_update(transaction)
+
             self.logger.info(f"✅ 成功更新卡片字典: {values}")
             return True
 
