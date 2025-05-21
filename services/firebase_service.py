@@ -184,34 +184,34 @@ class FirebaseService:
         try:
             doc_ref = self.db.collection(collection).document(document_id)
 
-            # Firebase Admin SDK 的正確 transaction 寫法
             @firestore.transactional
             def transaction_update(transaction):
-                # 在 Firebase Admin SDK 中，直接從 doc_ref 讀取
-                snapshot = doc_ref.get()  # 不是從 transaction.get()
+                snapshot = doc_ref.get()
+                if snapshot.exists:
+                    current_data = snapshot.to_dict()
+                    current_cards = current_data.get("collectedCardIdsDict", {})
+                    self.logger.info(f"🧾 [更新前] 目前擁有的卡牌: {current_cards}")
+                else:
+                    self.logger.info("🧾 [更新前] 無卡牌記錄，將建立新資料")
 
                 if not snapshot.exists:
-                    # 文件不存在：直接建立完整結構
                     initial_dict = {}
                     initial_log = {}
-
-                    # 加入所有要更新的值
                     for card_id, value in values.items():
                         initial_dict[card_id] = value
                         initial_log[card_id] = firestore.SERVER_TIMESTAMP
-
-                    # 一次性建立整個文件
                     transaction.set(doc_ref, {field: initial_dict, "collectedCardLog": initial_log})
                 else:
-                    # 文件存在：使用點記法更新
                     updates = {}
                     for card_id, value in values.items():
                         updates[f"{field}.{card_id}"] = value
                         updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
-
                     transaction.update(doc_ref, updates)
 
-            # 執行 transaction
+                # 讀取更新後內容（模擬，但 transaction 中不能再次讀取）
+                final_cards = {**current_cards, **values} if snapshot.exists else values
+                self.logger.info(f"🆕 [預期更新後] 卡牌: {final_cards}")
+
             transaction = self.db.transaction()
             transaction_update(transaction)
 
