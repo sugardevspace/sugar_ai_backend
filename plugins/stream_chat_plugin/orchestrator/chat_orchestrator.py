@@ -324,7 +324,7 @@ class ChatOrchestrator:
         """
         根據聊天模式選擇對應的 LLM 模型
         """
-        return {"小說": None, "簡訊": None, "開車": "grok-3", "親密度": None}.get(chat_mode, "default model")
+        return {"小說": None, "簡訊": None, "開車": "grok-2-1212", "親密度": None}.get(chat_mode, "default model")
 
     async def _format_story_prompt(self, prompt_context: Dict[str, Any]) -> List[Dict[str, str]]:
         # 將消息列表轉換為字符串
