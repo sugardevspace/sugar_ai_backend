@@ -327,7 +327,7 @@ class ChatOrchestrator:
         return {
             "小說": 'gpt-4.1-2025-04-14',
             "簡訊": 'gpt-4.1-2025-04-14',
-            "開車": "grok-2-1212",
+            "開車": "grok-3",
             "親密度": None
         }.get(chat_mode, "default model")
 
