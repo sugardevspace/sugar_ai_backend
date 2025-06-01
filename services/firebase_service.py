@@ -183,10 +183,15 @@ class FirebaseService:
 
         try:
             doc_ref = self.db.collection(collection).document(document_id)
+            # 新增：user_cards collection 的文檔引用
+            user_cards_doc_ref = self.db.collection("user_cards").document(document_id)
 
             @firestore.transactional
             def transaction_update(transaction):
                 snapshot = doc_ref.get()
+                # 新增：同時讀取 user_cards 的文檔
+                user_cards_snapshot = user_cards_doc_ref.get()
+
                 if snapshot.exists:
                     current_data = snapshot.to_dict()
                     current_cards = current_data.get("collectedCardIdsDict", {})
@@ -194,6 +199,7 @@ class FirebaseService:
                 else:
                     self.logger.info("🧾 [更新前] 無卡牌記錄，將建立新資料")
 
+                # 原始 collection 的更新邏輯
                 if not snapshot.exists:
                     initial_dict = {}
                     initial_log = {}
@@ -208,14 +214,99 @@ class FirebaseService:
                         updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
                     transaction.update(doc_ref, updates)
 
+                # 新增：同步更新 user_cards collection
+                if not user_cards_snapshot.exists:
+                    # 如果 user_cards 中沒有這個文檔，創建新的
+                    initial_dict = {}
+                    initial_log = {}
+                    for card_id, value in values.items():
+                        initial_dict[card_id] = value
+                        initial_log[card_id] = firestore.SERVER_TIMESTAMP
+
+                    user_cards_data = {
+                        field: initial_dict,
+                        "collectedCardLog": initial_log,
+                        "userId": document_id,  # 添加 userId 欄位便於查詢
+                        "createdAt": firestore.SERVER_TIMESTAMP,
+                        "updatedAt": firestore.SERVER_TIMESTAMP
+                    }
+                    transaction.set(user_cards_doc_ref, user_cards_data)
+                    self.logger.info(f"🆕 在 user_cards 中創建新文檔: {document_id}")
+                else:
+                    # 如果 user_cards 中已有文檔，更新它
+                    user_cards_updates = {}
+                    for card_id, value in values.items():
+                        user_cards_updates[f"{field}.{card_id}"] = value
+                        user_cards_updates[f"collectedCardLog.{card_id}"] = firestore.SERVER_TIMESTAMP
+                    user_cards_updates["updatedAt"] = firestore.SERVER_TIMESTAMP
+
+                    transaction.update(user_cards_doc_ref, user_cards_updates)
+                    self.logger.info(f"🔄 更新 user_cards 中的文檔: {document_id}")
+
                 # 讀取更新後內容（模擬，但 transaction 中不能再次讀取）
-                final_cards = {**current_cards, **values} if snapshot.exists else values
+                current_cards = current_data.get("collectedCardIdsDict", {}) if snapshot.exists else {}
+                final_cards = {**current_cards, **values}
                 self.logger.info(f"🆕 [預期更新後] 卡牌: {final_cards}")
 
             transaction = self.db.transaction()
             transaction_update(transaction)
 
-            self.logger.info(f"✅ 成功更新卡片字典: {values}")
+            # 新增：transaction 完成後重新讀取資料庫做確認
+            try:
+                # 讀取原始 collection 的最新狀態
+                updated_doc = doc_ref.get()
+                if updated_doc.exists:
+                    updated_data = updated_doc.to_dict()
+                    updated_cards = updated_data.get("collectedCardIdsDict", {})
+                    updated_log = updated_data.get("collectedCardLog", {})
+                    self.logger.info(f"🔍 [原始collection確認] 最新卡牌: {updated_cards}")
+
+                    # 驗證所有更新的卡片是否都存在
+                    for card_id in values.keys():
+                        if card_id not in updated_cards:
+                            self.logger.warning(f"⚠️ [原始collection] 卡片 {card_id} 未找到")
+                        else:
+                            self.logger.info(f"✓ [原始collection] 卡片 {card_id}: {updated_cards[card_id]}")
+                else:
+                    self.logger.error(f"❌ [原始collection確認] 文檔不存在: {document_id}")
+
+                # 讀取 user_cards collection 的最新狀態
+                updated_user_cards_doc = user_cards_doc_ref.get()
+                if updated_user_cards_doc.exists:
+                    updated_user_cards_data = updated_user_cards_doc.to_dict()
+                    updated_user_cards = updated_user_cards_data.get("collectedCardIdsDict", {})
+                    updated_user_cards_log = updated_user_cards_data.get("collectedCardLog", {})
+                    self.logger.info(f"🔍 [user_cards確認] 最新卡牌: {updated_user_cards}")
+
+                    # 驗證所有更新的卡片是否都存在
+                    for card_id in values.keys():
+                        if card_id not in updated_user_cards:
+                            self.logger.warning(f"⚠️ [user_cards] 卡片 {card_id} 未找到")
+                        else:
+                            self.logger.info(f"✓ [user_cards] 卡片 {card_id}: {updated_user_cards[card_id]}")
+
+                    # 比較兩個 collection 的數據是否一致
+                    data_consistent = True
+                    for card_id in values.keys():
+                        if updated_cards.get(card_id) != updated_user_cards.get(card_id):
+                            self.logger.error(
+                                f"❌ 數據不一致! 卡片 {card_id}: 原始={updated_cards.get(card_id)}, user_cards={updated_user_cards.get(card_id)}"
+                            )
+                            data_consistent = False
+
+                    if data_consistent:
+                        self.logger.info("✅ 兩個 collection 數據一致性驗證通過")
+                    else:
+                        self.logger.error("❌ 兩個 collection 數據不一致")
+
+                else:
+                    self.logger.error(f"❌ [user_cards確認] 文檔不存在: {document_id}")
+
+            except Exception as e:
+                self.logger.error(f"❌ 確認資料庫狀態時發生錯誤: {e}")
+
+            self.logger.info(f"✅ 成功更新卡片字典到兩個 collection: {values}")
+            self.logger.info(f"📁 已同步更新: {collection} 和 user_cards")
             return True
 
         except Exception as e:
