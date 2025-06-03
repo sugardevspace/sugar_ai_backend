@@ -154,6 +154,7 @@ class ChatOrchestrator:
             "小說": "story",
             "簡訊": "text",
             "開車": "stimulation",
+            "陪伴": "stimulation",
             "親密度": "intimacy",
             "關卡": "level",
             "user_persona": "user_persona"
@@ -327,7 +328,7 @@ class ChatOrchestrator:
             raise
 
     def _get_chat_mode(self, chat_mode: str) -> str:
-        mode_map = {"小說": "story", "故事": "story", "簡訊": "text", "開車": "NSFW", "關卡": "level"}
+        mode_map = {"小說": "story", "故事": "story", "簡訊": "text", "開車": "NSFW", "關卡": "level", "陪伴": "NSFW"}
         # 用傳入的 chat_mode 去查 map，而不是把 map 當 key
         return mode_map.get(chat_mode, "story")
 
@@ -339,6 +340,7 @@ class ChatOrchestrator:
             "小說": 'gpt-4.1-2025-04-14',
             "簡訊": 'gpt-4.1-2025-04-14',
             "開車": "grok-3",
+            "陪伴": "grok-3",
             "親密度": None
         }.get(chat_mode, "default model")
 
