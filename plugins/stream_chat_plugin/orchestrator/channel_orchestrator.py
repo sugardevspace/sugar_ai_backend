@@ -69,9 +69,6 @@ class ChannelOrchestrator:
                     }
                 }
 
-                user_card_collections = {"collectedCardIdsDict": {}}
-                await self.firebase_service.set_document("user_card_collections", user_id, user_card_collections)
-
                 self.logger.debug(f"角色快取: {character_info}")
                 self.logger.debug(f"使用者快取: {user_persona}")
                 self.logger.info(f"channel_doc: {channel_doc}")
