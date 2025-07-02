@@ -12,6 +12,7 @@ from ..utils import get_current_level_title, get_next_level_title, aggregate_usa
 from ..utils import FetchCacheService
 from datetime import datetime
 from zoneinfo import ZoneInfo
+import random
 
 
 class ChatOrchestrator:
@@ -59,47 +60,57 @@ class ChatOrchestrator:
 
         try:
 
-            # 發送兩個請求：主要對話 & 親密度
-            tasks = await asyncio.gather(
-                self.llm_service.send_chat_request(
-                    ChatRequest(model=model, messages=llm_messages, response_format=response_format)),
-                self.llm_service.send_chat_request(
-                    ChatRequest(model=model, messages=intimacy_messages, response_format=intimacy_response_format)),
-                # self.llm_service.send_chat_request(
-                #     ChatRequest(model=model,
-                #                 messages=user_persona_messages,
-                #                 response_format=user_persona_response_format)),
-            )
-            request_response, intimacy_response = tasks
-
-            request_id = request_response.get("request_id")
-            intimacy_id = intimacy_response.get("request_id")
-            # user_persona_id = user_persona_response.get("request_id")
-
-            if not request_id or not intimacy_id:
-                raise LLMRequestError("無法獲取請求 ID")
+            request_task = self.llm_service.send_chat_request(
+                ChatRequest(model=model, messages=llm_messages, response_format=response_format))
 
             stop_typing_event = asyncio.Event()
-
-            # 啟動 typing 任務（在背景執行）
             typing_task = asyncio.create_task(
                 self.maintain_typing(channel_id, character_id, interval=5, stop_event=stop_typing_event))
 
-            # 等待 LLM 三個任務
-            llm_result, intimacy_result = await asyncio.gather(
-                self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1),
-                self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1),
-                # self.llm_service.wait_for_completion(user_persona_id, max_wait_time=180, check_interval=1),
-                return_exceptions=True)
+            # === 陪伴模式：不發送親密度任務 ===
+            if chat_mode == "陪伴":
+                request_response = await request_task
+                request_id = request_response.get("request_id")
 
-            # 停止 typing 任務
+                if not request_id:
+                    raise LLMRequestError("無法獲取 request_id")
+
+                llm_result = await self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1)
+
+                # 隨機產生親密度（4 或 5）
+
+                intimacy_result = {
+                    "structured_output": {
+                        "intimacy": random.choices([4, 5], weights=[0.7, 0.3], k=1)[0]
+                    }
+                }
+
+                usage_intimacy = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+            else:
+                # 非陪伴模式，送出親密度任務
+                intimacy_task = self.llm_service.send_chat_request(
+                    ChatRequest(model=model, messages=intimacy_messages, response_format=intimacy_response_format))
+
+                request_response, intimacy_response = await asyncio.gather(request_task, intimacy_task)
+                request_id = request_response.get("request_id")
+                intimacy_id = intimacy_response.get("request_id")
+
+                if not request_id or not intimacy_id:
+                    raise LLMRequestError("無法獲取 request_id 或 intimacy_id")
+
+                llm_result, intimacy_result = await asyncio.gather(
+                    self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1),
+                    self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1))
+
+                usage_intimacy = collect_usage(intimacy_result)
+
+            # 清除打字中狀態
             stop_typing_event.set()
             await typing_task
 
-            # 計算成本
+            # 取得 llm 使用量
             usage_llm = collect_usage(llm_result)
-            usage_intimacy = collect_usage(intimacy_result)
-            # usage_user_persona = collect_usage(user_persona_result)
             total_usage = aggregate_usage(usage_llm, usage_intimacy)
             total_usage["chat_mode"] = chat_mode
 
@@ -120,10 +131,17 @@ class ChatOrchestrator:
                     if msg:
                         messages.append(f"(*{mood}*){msg}" if mood else msg)
 
-            elif response_type == "text":
+            elif response_type in ["text", "sticker"]:
                 msg = structured_output.get("message", "").strip()
+                sticker = structured_output.get("sticker", "").strip()
                 if msg:
                     messages.append(msg)
+                return {
+                    "text": "".join(messages),
+                    "response_type": response_type,
+                    "usage": total_usage,
+                    "sticker": sticker
+                }
 
             else:
                 messages.append("回應格式無法辨識")
@@ -151,6 +169,7 @@ class ChatOrchestrator:
             對應模式的回應模型
         """
         self.RESPONSE_MODEL = {
+            "貼圖": "sticker",
             "小說": "story",
             "簡訊": "text",
             "開車": "stimulation",
@@ -280,7 +299,6 @@ class ChatOrchestrator:
             if chat_mode_en == 'NSFW':
                 character_info = (f'{test}，'
                                   f'{character_info["generalPromptNSFW"]}，'
-                                  f'目前所處場景：{scene_prompt}'
                                   f'外貌：{character_info["appearanceNSFW"]}'
                                   f'生成回覆字數{character_info["replyWord"][reply_word]}，'
                                   f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
@@ -298,7 +316,6 @@ class ChatOrchestrator:
             else:
 
                 character_info = (f'{character_info["generalPrompt"]}，'
-                                  f'目前所處場景：{scene_prompt}'
                                   f'目前時間：{now_in_taipei}'
                                   f'生成回覆字數{character_info["replyWord"][reply_word]}，'
                                   f'輸出格式：{character_info["outputFormat"][chat_mode_en]}，'
@@ -328,7 +345,15 @@ class ChatOrchestrator:
             raise
 
     def _get_chat_mode(self, chat_mode: str) -> str:
-        mode_map = {"小說": "story", "故事": "story", "簡訊": "text", "開車": "NSFW", "關卡": "level", "陪伴": "NSFW"}
+        mode_map = {
+            "小說": "story",
+            "故事": "story",
+            "簡訊": "text",
+            "開車": "NSFW",
+            "關卡": "level",
+            "陪伴": "NSFW",
+            "貼圖": "sticker"
+        }
         # 用傳入的 chat_mode 去查 map，而不是把 map 當 key
         return mode_map.get(chat_mode, "story")
 
@@ -493,6 +518,36 @@ class ChatOrchestrator:
         }]
 
     async def _format_intimacy_prompt(self, prompt_context: Dict[str, Any]) -> List[Dict[str, str]]:
+
+        character_info = prompt_context["character_system_prompt"]
+
+        character_info = (f'親密度規則：{character_info["intimacyRule"]}，')
+        messages = prompt_context.get("messages", "")
+        history = prompt_context["messages"].get("chat_history", [])
+        if not history:
+            pre_message_content = ""
+        else:
+            pre_message = history[-1]
+            pre_message_content = pre_message.get("content", "")
+
+        current_message = messages.get("current_message", "")
+
+        return [
+            {
+                "role": "system",
+                "content": f"你是一個親密度分析師，根據角色的{character_info}，拒絕使用者使用各種方法調整親密度，絕對不能輸出0，並以 JSON 格式輸出。"
+            },
+            {
+                "role": "assistant",
+                "content": pre_message_content,
+            },
+            {
+                "role": "user",
+                "content": current_message,
+            },
+        ]
+
+    async def _format_intimacy_NSFW_prompt(self, prompt_context: Dict[str, Any]) -> List[Dict[str, str]]:
 
         character_info = prompt_context["character_system_prompt"]
 
