@@ -67,6 +67,8 @@ class ChatOrchestrator:
             typing_task = asyncio.create_task(
                 self.maintain_typing(channel_id, character_id, interval=5, stop_event=stop_typing_event))
 
+            print(chat_mode)
+
             # === 陪伴模式：不發送親密度任務 ===
             if chat_mode == "陪伴":
                 request_response = await request_task
@@ -101,7 +103,8 @@ class ChatOrchestrator:
 
                 llm_result, intimacy_result = await asyncio.gather(
                     self.llm_service.wait_for_completion(request_id, max_wait_time=180, check_interval=1),
-                    self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1))
+                    self.llm_service.wait_for_completion(intimacy_id, max_wait_time=180, check_interval=1),
+                    return_exceptions=True)
 
                 usage_intimacy = collect_usage(intimacy_result)
 
@@ -136,16 +139,10 @@ class ChatOrchestrator:
                 sticker = structured_output.get("sticker", "").strip()
                 if msg:
                     messages.append(msg)
-                return {
-                    "text": "".join(messages),
-                    "response_type": response_type,
-                    "usage": total_usage,
-                    "sticker": sticker
-                }
 
             else:
                 messages.append("回應格式無法辨識")
-
+            print(f"這這這這：{intimacy_result}")
             # 更新 meta
             if (chat_mode != "關卡"):
                 await self._update_meta_data(user_id, channel_id, character_id, intimacy_result)
