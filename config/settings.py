@@ -40,6 +40,7 @@ class Settings:
 
     def __init__(self):
         self.API_KEY = os.getenv("API_KEY", "")
+        self.PORT = os.getenv("PORT", 8080)
         # Stream Chat 設定
         self.STREAM_CHAT_SETTINGS = {
             "API_KEY": os.getenv("STREAM_CHAT_API_KEY", ""),
