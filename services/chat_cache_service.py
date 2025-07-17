@@ -470,7 +470,8 @@ class ChatCacheService:
                     "current_level": "",
                     "next_level": "",
                     "lock_level": 1,
-                }
+                },
+                "locale": None
             }
 
             # 從Firebase數據中提取user_persona
@@ -487,6 +488,8 @@ class ChatCacheService:
                 channel_data["meta_data"]["current_level"] = meta_data.get("current_level", "")
                 channel_data["meta_data"]["next_level"] = meta_data.get("next_level", "")
                 channel_data["meta_data"]["lock_level"] = meta_data.get("lock_level", 1)
+            if "locale" in firebase_data:
+                channel_data['locale'] = firebase_data['locale']
 
             self.logger.debug("已將Firebase數據轉換為頻道數據快取格式")
             return channel_data
