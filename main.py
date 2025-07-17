@@ -9,7 +9,7 @@ from services.auto_registry import AutoServiceRegistry
 
 # 設定日誌
 logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL),
-        format="%(asctime)s - %(module)s:%(lineno)d - %(levelname)s - %(message)s")
+        format="[%(levelname)s] %(asctime)s | %(module)s:%(lineno)d - %(message)s")
                     # format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("main")
 

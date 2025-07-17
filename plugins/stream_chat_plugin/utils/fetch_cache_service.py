@@ -18,7 +18,7 @@ class FetchCacheService:
         self.stream_chat_service = stream_chat_service
         self.logger = logger
 
-    async def fetch_and_cache_character(self, character_id: str) -> Dict[str, Any]:
+    async def fetch_and_cache_character(self, character_id: str, request_locale: str = None) -> Dict[str, Any]:
         """
         通用的 fetch + cache（針對角色資料）。
 
@@ -35,24 +35,39 @@ class FetchCacheService:
           'levels': { '1': {...}, ... }
         }
         """
+        self.logger.info(f"Fetching character {character_id} with requested locale {request_locale}")
         # 1. 快取命中檢查
         if self.chat_cache_service.has_character_cache(character_id):
             return self.chat_cache_service.get_character(character_id)
 
         # 2. 呼叫 fetch_cache 一次拉所有子集合
-        raw_data = await self.firebase_service.query_documents_with_subcollection_map(
-            collection="ai_characters",
-            doc_id=character_id,
-            sub_collections=["levels", "systemPrompt"],
-            sub_doc_id="info")
+        raw_data = await self.firebase_service.query_document(
+            collection="Characters",
+            doc_id=character_id,)
 
         if not raw_data:
             self.logger.warning(f"_fetch_character 未取得角色 {character_id} 原始資料")
             return {}
 
+        i18n = raw_data.get('i18n', {})
+        if not i18n:
+            self.logger.warning(f"Character {character_id}'s i18n is empty")
+            return {}
+
+        if "default_locale" not in raw_data:
+            logging.warning(f"Character {character_id}'s default_locale not found")
+        locale = raw_data.get("default_locale", None)
+        if request_locale and request_locale in i18n.keys():
+            locale = request_locale
+
+        self.logger.info(f"Fetching character {character_id} with requested locale {request_locale}, use {locale}")
+        if locale is None:
+            self.logger.warning(f"Character {character_id}'s locale is None")
+            return {}
+
         # 3. 解析 system_prompt 和 levels
-        system_prompt: Dict[str, Any] = raw_data.get('systemPrompt', {}) or {}
-        levels_raw = raw_data.get('levels', {}) or {}
+        system_prompt: Dict[str, Any] = i18n.get(locale, {}).get('system_prompt', {}) or {}
+        levels_raw = i18n.get(locale, {}).get('levels', {}) or {}
 
         # systemPrompt 直接使用返回的字典
         if not isinstance(system_prompt, dict):
@@ -60,17 +75,8 @@ class FetchCacheService:
             system_prompt = {}
 
         # 從 levels 字典中提取 info 陣列
-        levels_list = []
-        if isinstance(levels_raw, dict) and 'info' in levels_raw and isinstance(levels_raw['info'], list):
-            levels_list = levels_raw['info']
-            self.logger.debug(f"從 levels.info 中提取陣列，長度: {len(levels_list)}")
-        else:
-            self.logger.error(f"角色 {character_id} levels 子集合格式不符或不包含 info 陣列: {type(levels_raw)}")
-            # 如果不符合預期格式，直接返回空結果
-            return {}
-
         # 4. 將 levels list 轉成字典格式
-        levels_map: Dict[str, Any] = {str(i + 1): lvl for i, lvl in enumerate(levels_list)}
+        levels_map: Dict[str, Any] = {str(i + 1): lvl for i, lvl in enumerate(levels_raw)}
 
         # 5. 寫入 chat cache
         self.chat_cache_service.store_character(character_id=character_id,

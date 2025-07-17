@@ -208,3 +208,4 @@ auto/Dockerfile
 .vscode/settings.json
 server.py
 .DS_Store
+__secrets/

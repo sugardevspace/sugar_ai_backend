@@ -283,6 +283,15 @@ class AsyncFirebaseService:
         # 這不需要非同步，因為它只是返回一個物件參考
         return self.firebase_service.db.SERVER_TIMESTAMP
 
+    async def query_document(self,
+                            collection: str,
+                            doc_id: str,
+                            ) -> Optional[Dict[str, Any]]:
+        # 1. 先拿主文件
+        main_doc = await asyncio.to_thread(self.firebase_service.get_document,
+                                           collection=collection,
+                                           document_id=doc_id)
+        return main_doc
     async def query_documents_with_subcollection_map(self,
                                                      collection: str,
                                                      doc_id: str,

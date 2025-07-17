@@ -114,7 +114,7 @@ class AsyncStreamChatPlugin(BasePlugin):
             return result
 
         except Exception as e:
-            self.logger.error(f"處理新消息時發生錯誤: {e}")
+            self.logger.exception(f"處理新消息時發生錯誤: {e}")
             return {"status": "error", "reason": str(e)}
 
     async def _handle_channel_created(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
