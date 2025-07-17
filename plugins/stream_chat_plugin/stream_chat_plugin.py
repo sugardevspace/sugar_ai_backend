@@ -187,6 +187,6 @@ class AsyncStreamChatPlugin(BasePlugin):
 
     async def get_status(self) -> Dict[str, Any]:
         """獲取插件狀態"""
-        status = await super().get_status()
+        status = super().get_status()
         status.update({"stats": self.stats})
         return status

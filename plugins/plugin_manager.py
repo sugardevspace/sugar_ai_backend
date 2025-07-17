@@ -81,9 +81,22 @@ class PluginManager:
         """根據名稱取得插件實例"""
         return self._plugins.get(plugin_name)
 
-    def list_plugins(self) -> List[Dict[str, Any]]:
-        """列出所有已載入的插件及其狀態"""
-        return [plugin.get_status() for plugin in self._plugins.values()]
+    async def list_plugins(self) -> List[Dict[str, Any]]:
+        statuses = []
+        for name, plugin in self._plugins.items():
+            try:
+                result = plugin.get_status()
+                # 只有是 coroutine/awaitable 才 await
+                if inspect.isawaitable(result):
+                    result = await result
+                # 確保拿到 dict
+                if not isinstance(result, dict):
+                    raise TypeError(f"{name}.get_status() 必須回傳 dict")
+                statuses.append(result)
+            except Exception as e:
+                self.logger.error(f"載入插件 {name} 狀態失敗：{e}", exc_info=True)
+                statuses.append({"name": name, "status": "error", "error": str(e)})
+        return statuses
 
     async def start_all_plugins(self) -> None:
         for plugin_name, plugin in self._plugins.items():
