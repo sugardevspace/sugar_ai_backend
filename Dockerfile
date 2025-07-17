@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 8000
 
 # 啟動 FastAPI 應用程式
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
