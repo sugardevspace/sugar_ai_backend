@@ -58,12 +58,11 @@ class AutoServiceRegistry:
                     ok = await init_m()
                 else:
                     ok = init_m()
+                if ok:
+                    logger.info(f"成功載入 service：{name}")
                 if ok is False:
                     logger.error(f"服務 {name} 初始化失敗")
-                    continue
-
             # 註冊到服務列表
             services[name] = instance
-            logger.info(f"成功載入 service：{name}")
 
         return services
