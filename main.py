@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from core.routers.levels_router import router as levels_router_router
 from core.routers.test_router import router as test_router
 from core.routers.cache_router import router as cache_router
+from core.routers.firebase_router import router as firebase_router
 from plugins.plugin_manager import PluginManager
 from config.settings import settings
 from services.auto_registry import AutoServiceRegistry
@@ -52,6 +53,7 @@ app = FastAPI(title="Sugar AI Backend", lifespan=lifespan)
 app.include_router(test_router)
 app.include_router(levels_router_router)
 app.include_router(cache_router)
+app.include_router(firebase_router)
 
 
 @app.post("/webhook/stream-chat")

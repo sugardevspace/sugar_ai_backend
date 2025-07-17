@@ -72,6 +72,36 @@ class FirebaseService:
             self.logger.error(f"Firebase 初始化失敗: {e}")
             return False
 
+    def restart_service(self):
+        """Restart Firebase service and reload credentials"""
+        try:
+            # Check if service is already initialized
+            if not self.initialized:
+                self.logger.warning("Firebase service is not initialized yet")
+                return self.initialize()
+    
+            # Delete all apps first
+            firebase_admin.delete_app(self.app)
+            
+            # Reset internal state
+            self.app = None
+            self.db = None
+            self.initialized = False
+            
+            # Reinitialize
+            success = self.initialize()
+            
+            if success:
+                self.logger.info("Firebase service successfully restarted")
+                return True
+            else:
+                self.logger.error("Failed to restart Firebase service")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error restarting Firebase service: {e}")
+            self.initialized = False  # Ensure initialized is False on error
+            return False 
+
     # === Firestore 資料庫操作方法 ===
     def get_document(self, collection: str, document_id: str) -> Optional[Dict[str, Any]]:
         """

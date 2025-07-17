@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from typing import Dict, Any, List, Optional, Tuple
+from asyncio import Lock
 
 from services.firebase_service import FirebaseService
 
@@ -23,6 +24,10 @@ class AsyncFirebaseService:
             config: Firebase 配置字典 (當無法使用檔案路徑時)
         """
         self.logger = logging.getLogger("async_firebase_service")
+        # ...existing code...
+        self._restart_lock = Lock()
+        self._is_restarting = False
+
 
         # 如果提供了現有的 FirebaseService 實例，則使用它
         if firebase_service:
@@ -39,8 +44,56 @@ class AsyncFirebaseService:
             bool: 初始化是否成功
         """
         return await asyncio.to_thread(self.firebase_service.initialize)
+    # Add this import at the top with other imports
 
-    # === Firestore 資料庫操作的非同步方法 ===
+    # Add this new method
+    async def restart_service(self) -> Dict[str, Any]:
+        """
+        Restart Firebase service with thread-safe lock to prevent multiple restarts
+        
+        Returns:
+            Dict[str, Any]: Status of the restart operation
+        """
+        if self._is_restarting:
+            return {
+                "status": "error",
+                "reason": "Service is already restarting",
+                "initialized": self.firebase_service.initialized
+            }
+
+        async with self._restart_lock:
+            try:
+                self._is_restarting = True
+                self.logger.info("Starting Firebase service restart...")
+
+                # Run the synchronous restart in a thread pool
+                success = await asyncio.to_thread(self.firebase_service.restart_service)
+
+                if success:
+                    self.logger.info("Firebase service restarted successfully")
+                    return {
+                        "status": "success",
+                        "message": "Firebase service restarted successfully",
+                        "initialized": self.firebase_service.initialized
+                    }
+                else:
+                    self.logger.error("Failed to restart Firebase service")
+                    return {
+                        "status": "error",
+                        "reason": "Failed to restart Firebase service",
+                        "initialized": self.firebase_service.initialized
+                    }
+
+            except Exception as e:
+                self.logger.error(f"Error during Firebase service restart: {e}")
+                return {
+                    "status": "error",
+                    "reason": str(e),
+                    "initialized": self.firebase_service.initialized
+                }
+            finally:
+                self._is_restarting = False
+        # === Firestore 資料庫操作的非同步方法 ===
 
     async def get_document(self, collection: str, document_id: str) -> Optional[Dict[str, Any]]:
         """

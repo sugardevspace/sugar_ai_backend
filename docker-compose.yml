@@ -6,6 +6,9 @@ services:
     container_name: sugarai-fastapi
     ports:
       - "8080:8080"
+    volumes:
+      - .:/app        
+      - ./__secrets:/app/__secrets:ro
     env_file:
       - .env.local            # ← loads every key in .env
     restart: unless-stopped
