@@ -305,7 +305,7 @@ class ChatOrchestrator:
                                   f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
                                   f'生成回覆字數{character_info["reply_word"][reply_word]}，'
                                   f'{character_info["unique_specialty"]}，基本身份：{character_info["basic_identity"]}，'
-                                  f'語氣風格：{character_info["tone_wtyle"][intimacy_level]}，'
+                                  f'語氣風格：{character_info["tone_style"][intimacy_level]}，'
                                   f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
                                   f'口頭禪：{character_info["mantra"]}，'
                                   f'喜好與厭惡：{character_info["like_dislike"]}，'
