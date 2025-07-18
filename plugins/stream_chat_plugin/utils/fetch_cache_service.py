@@ -241,7 +241,7 @@ class FetchCacheService:
         {"user_persona": {...}, "meta_data": {...}}
         """
         # 1. 先從 cache 拿現有資料（若沒有就空 dict）
-        existing = self.chat_cache_service.get_channel_data(user_id, channel_id) or {}
+        existing = self.chat_cache_service.get_channel_data(channel_id) or {}
 
         # 2. 合併 new_data 到 existing
         merged = {**existing, **new_data}
