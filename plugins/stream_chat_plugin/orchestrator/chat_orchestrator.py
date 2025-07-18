@@ -208,7 +208,7 @@ class ChatOrchestrator:
         prompt_context = {}
         # channel 的 meta data 還有 user_persona
         try:
-            channel_info = await self.fetch_cache_service.fetch_and_cache_channel_data(user_id, channel_id)
+            channel_info = await self.fetch_cache_service.fetch_and_cache_channel_data(channel_id)
             if channel_info is None:
                 self.logger.warning(f"無法獲取頻道信息: {channel_id}")
                 prompt_context["meta_data"] = {}
@@ -258,7 +258,19 @@ class ChatOrchestrator:
             character_levels = prompt_context["levels"]
             chat_mode_en = self._get_chat_mode(chat_mode)
 
-            intimacy_level = prompt_context["meta_data"]["current_level"]
+            current_intimacy = prompt_context["meta_data"]["intimacy"]
+            current_level_key = list(character_levels.keys())[0]
+            for level_key, level in character_levels.items():
+                if level['intimacy'] > current_intimacy:
+                    break
+                current_level_key = level_key
+            
+            self.logger.info(f"Intimacy: {current_intimacy}, level idx: {current_level_key}")
+            current_level = character_levels.get(current_level_key, {})
+            self.logger.info(f"Current level keys: {current_level.keys()}")
+            tone_style = current_level['tone_style']
+            relationship = current_level['relationship']
+
             taipei_tz = ZoneInfo("Asia/Taipei")
             now_in_taipei = datetime.now(taipei_tz)
 
@@ -305,8 +317,8 @@ class ChatOrchestrator:
                                   f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
                                   f'生成回覆字數{character_info["reply_word"][reply_word]}，'
                                   f'{character_info["unique_specialty"]}，基本身份：{character_info["basic_identity"]}，'
-                                  f'語氣風格：{character_info["tone_style"][intimacy_level]}，'
-                                  f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
+                                  f'語氣風格：{tone_style}，'
+                                  f'和使用者關係：{relationship}，'
                                   f'口頭禪：{character_info["mantra"]}，'
                                   f'喜好與厭惡：{character_info["like_dislike"]}，'
                                   f'家庭背景：{character_info["family_background"]}，'
@@ -322,8 +334,8 @@ class ChatOrchestrator:
                                   f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
                                   f'生成回覆字數{character_info["reply_word"][reply_word]}，'
                                   f'{character_info["unique_specialty"]}，基本身份：{character_info["basic_identity"]}，'
-                                  f'語氣風格：{character_info["tone_style"][intimacy_level]}，'
-                                  f'和使用者關係：{character_info["relationship"][intimacy_level]}，'
+                                  f'語氣風格：{tone_style}，'
+                                  f'和使用者關係：{relationship}，'
                                   f'口頭禪：{character_info["mantra"]}，'
                                   f'喜好與厭惡：{character_info["like_dislike"]}，'
                                   f'家庭背景：{character_info["family_background"]}，'

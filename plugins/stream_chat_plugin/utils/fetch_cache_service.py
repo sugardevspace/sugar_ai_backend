@@ -68,6 +68,7 @@ class FetchCacheService:
         # 3. 解析 system_prompt 和 levels
         system_prompt: Dict[str, Any] = i18n.get(locale, {}).get('system_prompt', {}) or {}
         levels_raw = i18n.get(locale, {}).get('levels', {}) or {}
+        levels = sorted(levels_raw, key=lambda level: level['intimacy'])
 
         # systemPrompt 直接使用返回的字典
         if not isinstance(system_prompt, dict):
@@ -76,7 +77,7 @@ class FetchCacheService:
 
         # 從 levels 字典中提取 info 陣列
         # 4. 將 levels list 轉成字典格式
-        levels_map: Dict[str, Any] = {str(i + 1): lvl for i, lvl in enumerate(levels_raw)}
+        levels_map: Dict[str, Any] = {str(i + 1): lvl for i, lvl in enumerate(levels)}
 
         # 5. 寫入 chat cache
         self.chat_cache_service.store_character(character_id=character_id,
@@ -187,20 +188,20 @@ class FetchCacheService:
 
         return channel_data_cache
 
-    async def fetch_and_cache_channel_data(self, user_id: str, channel_id: str) -> dict[str, Any] | None:
+    async def fetch_and_cache_channel_data(self,channel_id: str) -> dict[str, Any] | None:
         """
         先從快取拿 channel_data，沒有時再從 Firestore 拉取、轉換、快取並回傳。
         回傳 None 表示該 channel 尚未建立或不存在。
         """
 
         # 1. 快取命中
-        cached = self.chat_cache_service.has_channel_data_cache(user_id, channel_id)
+        cached = self.chat_cache_service.has_channel_data_cache( channel_id)
         if cached:
-            self.logger.debug(f"快取命中，從快取拿 channel_data: user={user_id} channel={channel_id}")
-            cached = self.chat_cache_service.get_channel_data(user_id, channel_id)
+            self.logger.debug(f"快取命中，從快取拿 channel_data: channel={channel_id}")
+            cached = self.chat_cache_service.get_channel_data(channel_id)
             return cached
 
-        self.logger.debug(f"快取未命中，從 Firestore 拉取 channel_data: user={user_id} channel={channel_id}")
+        self.logger.debug(f"快取未命中，從 Firestore 拉取 channel_data:  channel={channel_id}")
 
         # 2. 從 Firestore 拉
         try:
@@ -222,7 +223,7 @@ class FetchCacheService:
 
         # 4. 寫入快取
         try:
-            self.chat_cache_service.store_channel_data(user_id, channel_id, channel_data)
+            self.chat_cache_service.store_channel_data(channel_id, channel_data)
         except Exception as e:
             self.logger.error(f"快取 channel_data 失敗：{e}")
 

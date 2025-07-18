@@ -368,7 +368,7 @@ class ChatCacheService:
             self.logger.error(traceback.format_exc())
             return False
 
-    def _ensure_channel_data_cache_exists(self, user_id: str, channel_id: str) -> Dict[str, Any]:
+    def _ensure_channel_data_cache_exists(self, channel_id: str) -> Dict[str, Any]:
         """
         確保指定用戶和頻道的數據快取存在，如果不存在則創建默認結構。
 
@@ -380,7 +380,7 @@ class ChatCacheService:
             Dict[str, Any]: 快取內容
         """
         try:
-            key = self._get_cache_key(user_id, channel_id)
+            key = channel_id
             if key not in self.user_channel_data_cache:
                 # 創建新的快取項，使用默認值初始化
                 default_data = {
@@ -413,10 +413,10 @@ class ChatCacheService:
                     "lock_level": 1,
                 }
             }
-            self.user_channel_data_cache[self._get_cache_key(user_id, channel_id)] = default_data
+            self.user_channel_data_cache[channel_id] = default_data
             return default_data
 
-    def has_channel_data_cache(self, user_id: str, channel_id: str) -> bool:
+    def has_channel_data_cache(self,channel_id: str) -> bool:
         """
         檢查指定用戶和頻道是否已有數據快取
         
@@ -428,14 +428,14 @@ class ChatCacheService:
             bool: 是否已有快取
         """
         try:
-            key = self._get_cache_key(user_id, channel_id)
+            key = channel_id
             return key in self.user_channel_data_cache
         except Exception as e:
             self.logger.error(f"檢查頻道數據快取是否存在時發生錯誤: {e}")
             self.logger.error(traceback.format_exc())
             return False
 
-    def get_channel_data(self, user_id: str, channel_id: str) -> Dict[str, Any]:
+    def get_channel_data(self,  channel_id: str) -> Dict[str, Any]:
         """
         獲取指定用戶和頻道的數據。
         如果快取不存在，返回默認數據結構。
@@ -447,7 +447,7 @@ class ChatCacheService:
         Returns:
             Dict[str, Any]: 包含 user_persona 和 meta_data 的字典
         """
-        return self._ensure_channel_data_cache_exists(user_id, channel_id)
+        return self._ensure_channel_data_cache_exists(channel_id)
 
     def convert_firebase_to_channel_data(self, firebase_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -509,7 +509,7 @@ class ChatCacheService:
                 }
             }
 
-    def store_channel_data(self, user_id: str, channel_id: str, channel_data: Dict[str, Any]) -> None:
+    def store_channel_data(self,  channel_id: str, channel_data: Dict[str, Any]) -> None:
         """
         存儲用戶頻道數據到快取
         
@@ -519,9 +519,8 @@ class ChatCacheService:
             channel_data (Dict[str, Any]): 頻道數據
         """
         try:
-            key = self._get_cache_key(user_id, channel_id)
-            self.user_channel_data_cache[key] = channel_data
-            self.logger.info(f"已存儲用戶 {user_id} 在頻道 {channel_id} 的數據到快取")
+            self.user_channel_data_cache[channel_id] = channel_data
+            self.logger.info(f"已存儲頻道 {channel_id} 的數據到快取")
         except Exception as e:
             self.logger.error(f"存儲頻道數據時發生錯誤: {e}")
             self.logger.error(traceback.format_exc())

@@ -76,11 +76,10 @@ class AsyncLevelPlugin(BasePlugin):
     async def handle_event(self, event_type: str, event_data: Dict[str, Any]) -> Any:
         """處理傳進來的事件，回傳要放到 results 裡的 dict"""
         try:
-            user_id = event_data["user_id"]
+            self.logger.info("Processing level event")
             channel_id = event_data["channel_id"]
             level = event_data["level"]
             character_id = extract_ai_id(channel_id)
-            # chat_mode = event_data["chat_mode"]
             chat_mode = "level"
 
             # 發出 typing.start 事件
@@ -102,38 +101,35 @@ class AsyncLevelPlugin(BasePlugin):
                 level_str = "1"  # 默認使用等級 1
 
             level_data = character_data["levels"][level_str]
-            if "scenePrompt" not in level_data:
-                self.logger.warning(f"角色 {character_id} 的等級 {level_str} 中沒有 scenePrompt 資料")
+            if "scene_prompt" not in level_data:
+                self.logger.warning(f"角色 {character_id} 的等級 {level_str} 中沒有 scene_prompt 資料")
                 return {"error": "等級提示不存在", "first_message": "抱歉，我現在有點問題，請稍後再試。"}
 
-            scene_prompt = level_data["scenePrompt"]
 
-            character_system_prompt = character_data.get("system_prompt", {})
-            channel_data = await self.fetch_cache_service.fetch_and_cache_channel_data(user_id, channel_id)
-            intimacy_level = channel_data["meta_data"]["current_level"]
+            character_levels = character_data["levels"]
+            current_level = character_levels.get(level_str)
+            tone_style = current_level['tone_style']
+            relationship = current_level['relationship']
             reply_word = "200"
-            character_system_prompt = (
-                f'{character_system_prompt["generalPrompt"]}，'
-                f'生成回覆字數{character_system_prompt["replyWord"][reply_word]}，'
-                f'輸出格式：{character_system_prompt["outputFormat"]["story"]}，'
-                f'生成回覆字數{character_system_prompt["replyWord"][reply_word]}，'
-                f'{character_system_prompt["uniqueSpecialty"]}，基本身份：{character_system_prompt["basicIdentity"]}，'
-                f'語氣風格：{character_system_prompt["toneStyle"][intimacy_level]}，'
-                f'和使用者關係：{character_system_prompt["relationship"][intimacy_level]}，'
+            character_system_prompt = character_data.get("system_prompt", {})
+            character_system_prompt_str = (
+                f'{character_system_prompt["general_prompt"]}，'
+                f'生成回覆字數{character_system_prompt["reply_word"][reply_word]}，'
+                f'輸出格式：{character_system_prompt["output_format"]["story"]}，'
+                f'生成回覆字數{character_system_prompt["reply_word"][reply_word]}，'
+                f'{character_system_prompt["unique_specialty"]}，基本身份：{character_system_prompt["basic_identity"]}，'
+                f'語氣風格：{tone_style}，'
+                f'和使用者關係：{relationship}，'
                 f'口頭禪：{character_system_prompt["mantra"]}，'
-                f'喜好與厭惡：{character_system_prompt["likeDislike"]}，'
-                f'家庭背景：{character_system_prompt["familyBackground"]}，'
-                f'重要角色：{character_system_prompt["importantRole"]}，'
+                f'喜好與厭惡：{character_system_prompt["like_dislike"]}，'
+                f'家庭背景：{character_system_prompt["family_background"]}，'
+                f'重要角色：{character_system_prompt["important_role"]}，'
                 f'外貌：{character_system_prompt["appearance"]}')
 
-            messages = [{"role": "system", "content": character_system_prompt}]
-            messages.append({"role": "user", "content": scene_prompt})
+            scene_prompt_str = level_data["scene_prompt"]
 
-            # response = await self.orchestrator.generate_response(user_id=user_id,
-            #                                                      channel_id=channel_id,
-            #                                                      input_text=scene_prompt,
-            #                                                      ai_character_id=character_id,
-            #                                                      chat_mode=chat_mode)
+            messages = [{"role": "system", "content": character_system_prompt_str}]
+            messages.append({"role": "user", "content": scene_prompt_str})
 
             request_response = await self.llm_service.send_chat_request(
                 ChatRequest(model=None, messages=messages, response_format=chat_mode))
