@@ -645,7 +645,7 @@ class ChatOrchestrator:
             self.logger.info(f"新的親密度變化: {intimacy}")
 
             # 拿到舊的 meta data
-            old_channel_data = await self.fetch_cache_service.fetch_and_cache_channel_data(user_id, channel_id)
+            old_channel_data = await self.fetch_cache_service.fetch_and_cache_channel_data(channel_id)
             old_meta_data = old_channel_data.get("meta_data", {})
             # 累加總親密度
             total_intimacy = old_meta_data.get("total_intimacy", 0) + intimacy
@@ -760,7 +760,7 @@ class ChatOrchestrator:
 
     async def _update_user_persona(self, user_id: str, channel_id: str, user_persona_result: dict) -> None:
         update_user_persona = user_persona_result.get("structured_output", {})
-        old_channel_data = await self.fetch_cache_service.fetch_and_cache_channel_data(user_id, channel_id)
+        old_channel_data = await self.fetch_cache_service.fetch_and_cache_channel_data(channel_id)
         old_user_persona = old_channel_data.get("user_persona", {})
 
         # 合併
