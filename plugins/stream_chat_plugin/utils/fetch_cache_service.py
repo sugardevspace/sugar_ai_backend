@@ -230,7 +230,7 @@ class FetchCacheService:
         # 5. 回傳
         return channel_data
 
-    async def update_and_cache_channel_data(self, user_id: str, channel_id: str, new_data: Dict[str, Any]) -> None:
+    async def update_and_cache_channel_data(self, channel_id: str, new_data: Dict[str, Any]) -> None:
         """
         更新 channel_data（可能是 user_persona、meta_data 或兩者），並同步更新 cache 與 Firestore。
 
@@ -248,7 +248,7 @@ class FetchCacheService:
 
         # 3. 更新快取
         #    chat_cache_service 期望存的是只有 user_persona & meta_data
-        self.chat_cache_service.store_channel_data(user_id, channel_id, merged)
+        self.chat_cache_service.store_channel_data(channel_id, merged)
 
         # 4. 讀 Firestore 原始文件（可能有更多欄位）
         try:

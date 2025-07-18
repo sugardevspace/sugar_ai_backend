@@ -750,8 +750,7 @@ class ChatOrchestrator:
 
                 # 第二步：更新頻道數據
                 self.logger.info(f"開始更新頻道數據: {new_meta}")
-                await self.fetch_cache_service.update_and_cache_channel_data(user_id=user_id,
-                                                                             channel_id=channel_id,
+                await self.fetch_cache_service.update_and_cache_channel_data(channel_id=channel_id,
                                                                              new_data=new_meta)
                 self.logger.info("頻道數據更新完成")
         except Exception as e:
@@ -769,7 +768,7 @@ class ChatOrchestrator:
         new_meta = {"user_persona": merged_persona}
 
         # 把合併後的結果存回 cache（或更新 DB）
-        await self.fetch_cache_service.update_and_cache_channel_data(user_id, channel_id, new_meta)
+        await self.fetch_cache_service.update_and_cache_channel_data(channel_id, new_meta)
 
     def merge_user_persona(self, old: dict, update: dict) -> dict:
         """
