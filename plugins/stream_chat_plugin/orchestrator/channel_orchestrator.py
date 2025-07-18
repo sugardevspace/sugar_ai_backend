@@ -33,7 +33,7 @@ class ChannelOrchestrator:
             self.logger.debug(f"開始建立頻道: channel_id={channel_id}, user_id={user_id}, character_id={character_id}")
 
             try:
-                character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id)
+                character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id, request_locale=None)
                 levels = character_info.get("levels", {})
             except Exception as e:
                 self.logger.error(f"抓取角色資料失敗: {str(e)}")

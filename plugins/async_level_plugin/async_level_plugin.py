@@ -90,7 +90,10 @@ class AsyncLevelPlugin(BasePlugin):
             except Exception as e:
                 self.logger.warning(f"發送 typing.start 失敗: {e}")
 
-            character_data = await self.fetch_cache_service.fetch_and_cache_character(character_id)
+            channel_info = await self.fetch_cache_service.fetch_and_cache_channel_data(channel_id)
+        # 角色 system prompt
+            channel_locale = channel_info.get("locale", None)
+            character_data = await self.fetch_cache_service.fetch_and_cache_character(character_id, request_locale=channel_locale)
             if not character_data or "levels" not in character_data:
                 self.logger.error(f"角色 {character_id} 的資料或等級資訊不存在")
                 return {"error": "角色資料不完整", "first_message": "抱歉，我現在有點問題，請稍後再試。"}
@@ -127,6 +130,9 @@ class AsyncLevelPlugin(BasePlugin):
                 f'外貌：{character_system_prompt["appearance"]}')
 
             scene_prompt_str = level_data["scene_prompt"]
+
+            self.logger.info(f"system prompt: {character_system_prompt_str}")
+            self.logger.info(f"Level scene: {scene_prompt_str}")
 
             messages = [{"role": "system", "content": character_system_prompt_str}]
             messages.append({"role": "user", "content": scene_prompt_str})

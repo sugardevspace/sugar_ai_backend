@@ -18,7 +18,7 @@ class FetchCacheService:
         self.stream_chat_service = stream_chat_service
         self.logger = logger
 
-    async def fetch_and_cache_character(self, character_id: str, request_locale: str = None) -> Dict[str, Any]:
+    async def fetch_and_cache_character(self, character_id: str, request_locale: str) -> Dict[str, Any]:
         """
         通用的 fetch + cache（針對角色資料）。
 
@@ -174,7 +174,7 @@ class FetchCacheService:
 
         # 1) 快取
         try:
-            self.chat_cache_service.store_channel_data(user_id, channel_id, channel_data_cache)
+            self.chat_cache_service.store_channel_data(channel_id, channel_data_cache)
         except Exception as e:
             self.logger.error(f"[store_cache] user={user_id} channel={channel_id} 失敗: {e}")
             raise

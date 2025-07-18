@@ -660,7 +660,7 @@ class ChatOrchestrator:
                 intimacy_percentage = old_meta_data.get("intimacy_percentage", 0)
             else:
                 try:
-                    character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id)
+                    character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id, request_locale=None)
                 except Exception as e:
                     self.logger.error(f"獲取角色資訊失敗: {e}")
 
