@@ -15,7 +15,6 @@ from zoneinfo import ZoneInfo
 import random
 
 
-
 class ChatOrchestrator:
     """
     協調聊天流程的類別，負責組裝 prompt context、生成 LLM 請求並回傳聊天回應
@@ -224,14 +223,14 @@ class ChatOrchestrator:
         # 角色 system prompt
         try:
             channel_locale = channel_info.get("locale", None)
-            character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id=character_id, request_locale=channel_locale)
+            character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id=character_id,
+                                                                                      request_locale=channel_locale)
             prompt_context["character_system_prompt"] = character_info.get("system_prompt", {})
             prompt_context["levels"] = character_info.get("levels", {})
         except Exception as e:
             self.logger.error(f"獲取角色系統提示時發生錯誤: {e}")
             prompt_context["character_system_prompt"] = {}
             prompt_context["levels"] = {}
-
 
         # 1. fetch and cache message
         try:
@@ -244,7 +243,6 @@ class ChatOrchestrator:
         except Exception as e:
             self.logger.error(f"獲取訊息時發生錯誤: {e}")
             prompt_context["messages"] = {}
-
 
         return prompt_context
 
@@ -264,7 +262,7 @@ class ChatOrchestrator:
                 if level['intimacy'] > current_intimacy:
                     break
                 current_level_key = level_key
-            
+
             self.logger.info(f"Intimacy: {current_intimacy}, level idx: {current_level_key}")
             current_level = character_levels.get(current_level_key, {})
             self.logger.info(f"Current level keys: {current_level.keys()}")
@@ -660,7 +658,8 @@ class ChatOrchestrator:
                 intimacy_percentage = old_meta_data.get("intimacy_percentage", 0)
             else:
                 try:
-                    character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id, request_locale=None)
+                    character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id,
+                                                                                              request_locale=None)
                 except Exception as e:
                     self.logger.error(f"獲取角色資訊失敗: {e}")
 
@@ -750,8 +749,7 @@ class ChatOrchestrator:
 
                 # 第二步：更新頻道數據
                 self.logger.info(f"開始更新頻道數據: {new_meta}")
-                await self.fetch_cache_service.update_and_cache_channel_data(channel_id=channel_id,
-                                                                             new_data=new_meta)
+                await self.fetch_cache_service.update_and_cache_channel_data(channel_id=channel_id, new_data=new_meta)
                 self.logger.info("頻道數據更新完成")
         except Exception as e:
             self.logger.error(f"更新meta數據時發生錯誤: {e}")
@@ -810,35 +808,34 @@ class ChatOrchestrator:
 
     def get_card_id(self, levels: dict, level_num: str, character_id: str) -> Optional[str]:
         """
-        取得角色特定等級的卡片 ID，格式為 '{character_id}-{level_num}'
+        取得角色特定等級的卡片 ID，格式為 '{character_id}-card-{level_num}'
         若該等級存在 hasCard 欄位且為 True，則回傳卡片 ID
-        
+
         參數:
             levels: 包含所有等級資訊的字典
             level_num: 要檢查的等級編號字串 (如 "1", "2" 等)
             character_id: 聊天頻道 ID
-        
+
         返回:
             Optional[str]: 卡片 ID 或 None (如果沒有卡片)
         """
-        self.logger.warning(f"levels：{levels}")
+        self.logger.info(f"開始取得卡片 ID，level_num={level_num}, character_id={character_id}")
+        self.logger.debug(f"levels 原始資料：{levels}")
         try:
-            # 檢查等級是否存在
             level_num = str(level_num)
             if level_num not in levels:
                 self.logger.warning(f"等級 {level_num} 不存在")
                 return None
 
-            # 獲取該等級資訊
             level_info = levels[level_num]
-
-            # 檢查 hasCard 欄位是否存在且為 True
-            has_card = level_info.get("hasCard", False)
+            has_card = level_info.get("has_card", False)
 
             if has_card:
-                # 格式化卡片 ID
-                return f"{character_id}-card-{level_num}"
+                card_id = f"{character_id}-card-{level_num}"
+                self.logger.info(f"已找到卡片: {card_id}")
+                return card_id
             else:
+                self.logger.info(f"等級 {level_num} 沒有對應卡片")
                 return None
         except Exception as e:
             self.logger.error(f"獲取卡片 ID 時發生錯誤: {e}")
