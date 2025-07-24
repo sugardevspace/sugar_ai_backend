@@ -257,12 +257,14 @@ class ChatOrchestrator:
             chat_mode_en = self._get_chat_mode(chat_mode)
 
             current_intimacy = prompt_context["meta_data"]["intimacy"]
-            current_level_key = list(character_levels.keys())[0]
-            for level_key, level in character_levels.items():
-                if level['intimacy'] > current_intimacy:
-                    break
-                current_level_key = level_key
-
+            current_level_key = lockedLevel
+            # 註解：lockedLevel是會從 stream chat 傳過來目前使用者正在使用的 level 關係是什麼
+            # current_level_key = list(character_levels.keys())[0]
+            # for level_key, level in character_levels.items():
+            #     if level['intimacy'] > current_intimacy:
+            #         break
+            #     current_level_key = level_key
+            print(f'current_level_key:{current_level_key}')
             self.logger.info(f"Intimacy: {current_intimacy}, level idx: {current_level_key}")
             current_level = character_levels.get(current_level_key, {})
             self.logger.info(f"Current level keys: {current_level.keys()}")

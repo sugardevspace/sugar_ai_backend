@@ -46,7 +46,8 @@ class AsyncMessageHandler:
         lockedLevel = message.get("lockedLevel", "1")
         ticket_cost = message.get("cost", "0")
         members = event_data.get("members", [])
-
+        clear_cache = message.get("clearCache", False)
+        print(f'快取：{clear_cache}')
         character_id = get_character_id(members=members)
         message_id = message.get("id")
         ai_name = self.get_ai_character_name(event_data.get("members", []))
