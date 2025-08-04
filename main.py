@@ -11,8 +11,8 @@ from services.auto_registry import AutoServiceRegistry
 
 # 設定日誌
 logging.basicConfig(level=getattr(logging, settings.LOG_LEVEL),
-        format="[%(levelname)s] %(asctime)s | %(module)s:%(lineno)d - %(message)s")
-                    # format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                    format="[%(levelname)s] %(asctime)s | %(module)s:%(lineno)d - %(message)s")
+# format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("main")
 
 
@@ -112,4 +112,4 @@ async def list_services(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=settings.port, reload=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=False)
