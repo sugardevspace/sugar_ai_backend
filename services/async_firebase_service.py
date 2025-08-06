@@ -28,7 +28,6 @@ class AsyncFirebaseService:
         self._restart_lock = Lock()
         self._is_restarting = False
 
-
         # 如果提供了現有的 FirebaseService 實例，則使用它
         if firebase_service:
             self.firebase_service = firebase_service
@@ -44,6 +43,7 @@ class AsyncFirebaseService:
             bool: 初始化是否成功
         """
         return await asyncio.to_thread(self.firebase_service.initialize)
+
     # Add this import at the top with other imports
 
     # Add this new method
@@ -86,11 +86,7 @@ class AsyncFirebaseService:
 
             except Exception as e:
                 self.logger.error(f"Error during Firebase service restart: {e}")
-                return {
-                    "status": "error",
-                    "reason": str(e),
-                    "initialized": self.firebase_service.initialized
-                }
+                return {"status": "error", "reason": str(e), "initialized": self.firebase_service.initialized}
             finally:
                 self._is_restarting = False
         # === Firestore 資料庫操作的非同步方法 ===
@@ -336,15 +332,17 @@ class AsyncFirebaseService:
         # 這不需要非同步，因為它只是返回一個物件參考
         return self.firebase_service.db.SERVER_TIMESTAMP
 
-    async def query_document(self,
-                            collection: str,
-                            doc_id: str,
-                            ) -> Optional[Dict[str, Any]]:
+    async def query_document(
+        self,
+        collection: str,
+        doc_id: str,
+    ) -> Optional[Dict[str, Any]]:
         # 1. 先拿主文件
         main_doc = await asyncio.to_thread(self.firebase_service.get_document,
                                            collection=collection,
                                            document_id=doc_id)
         return main_doc
+
     async def query_documents_with_subcollection_map(self,
                                                      collection: str,
                                                      doc_id: str,
@@ -459,3 +457,31 @@ class AsyncFirebaseService:
         """
         # 這不需要非同步，因為它只是返回一個物件參考
         return self.firebase_service.get_server_timestamp()
+
+    async def get_channel_locale(self, channel_id: str) -> Optional[str]:
+        """
+        直接從 Firestore 獲取頻道的語言設定，不使用快取
+        
+        Args:
+            channel_id: 頻道 ID
+            
+        Returns:
+            Optional[str]: 語言代碼，如果沒有找到則返回 None
+        """
+        try:
+            # 直接從 Firestore 拉取頻道文檔
+            channel_doc = await asyncio.to_thread(self.firebase_service.get_document, "channels", channel_id)
+
+            if not channel_doc:
+                self.logger.warning(f"頻道文檔不存在: {channel_id}")
+                return None
+
+            # 提取 locale 欄位
+            locale = channel_doc.get("locale", None)
+            self.logger.debug(f"頻道 {channel_id} 的語言設定: {locale}")
+
+            return locale
+
+        except Exception as e:
+            self.logger.error(f"獲取頻道語言設定時發生錯誤: {e}")
+            return None

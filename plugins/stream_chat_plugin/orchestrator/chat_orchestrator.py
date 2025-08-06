@@ -222,7 +222,9 @@ class ChatOrchestrator:
 
         # 角色 system prompt
         try:
-            channel_locale = channel_info.get("locale", None)
+
+            channel_locale = await self.firebase_service.get_channel_locale(channel_id)
+            self.logger.info(f"頻道 {channel_id} 使用語言: {channel_locale}")
             character_info = await self.fetch_cache_service.fetch_and_cache_character(character_id=character_id,
                                                                                       request_locale=channel_locale)
             prompt_context["character_system_prompt"] = character_info.get("system_prompt", {})
