@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 指定 FastAPI 服務的端口
-EXPOSE 8000
+EXPOSE 8080
 
 # 啟動 FastAPI 應用程式
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

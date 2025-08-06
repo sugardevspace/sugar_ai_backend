@@ -312,6 +312,7 @@ class ChatOrchestrator:
             if chat_mode_en == 'NSFW':
                 character_info = (f'{test}，'
                                   f'{character_info["general_prompt_NSFW"]}，'
+                                  f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
                                   f'外貌：{character_info["appearance_NSFW"]}'
                                   f'生成回覆字數{character_info["reply_word"][reply_word]}，'
                                   f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
@@ -330,14 +331,15 @@ class ChatOrchestrator:
             else:
 
                 character_info = (f'{character_info["general_prompt"]}，'
+                                  f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
                                   f'目前時間：{now_in_taipei}'
                                   f'生成回覆字數{character_info["reply_word"][reply_word]}，'
-                                  f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
                                   f'場景要根據使用者上下文來決定不能單純依照目前場景'
                                   f'生成回覆字數{character_info["reply_word"][reply_word]}，'
                                   f'{character_info["unique_specialty"]}，基本身份：{character_info["basic_identity"]}，'
                                   f'語氣風格：{tone_style}，'
                                   f'和使用者關係：{relationship}，'
+                                  f'輸出格式：{character_info["output_format"][chat_mode_en]}，'
                                   f'口頭禪：{character_info["mantra"]}，'
                                   f'喜好與厭惡：{character_info["like_dislike"]}，'
                                   f'家庭背景：{character_info["family_background"]}，'

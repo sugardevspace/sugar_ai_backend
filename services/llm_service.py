@@ -19,7 +19,7 @@ class LLMService:
         使用基礎URL和可選的API金鑰初始化LLM服務。
 
         參數:
-            base_url: LLM伺服器根URL，例如 http://localhost:8000
+            base_url: LLM伺服器根URL，例如 http://localhost:8080
             api_key: 可選的認證令牌
             timeout: 請求超時時間（秒）（預設：15）
         """
