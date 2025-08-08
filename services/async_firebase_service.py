@@ -267,7 +267,7 @@ class AsyncFirebaseService:
         Returns:
             Dict 或 None: 用戶個人資料，不存在則返回 None
         """
-        return await asyncio.to_thread(self.firebase_service.get_document, "users", user_id)
+        return await asyncio.to_thread(self.firebase_service.get_document, "Users", user_id)
 
     async def get_character_profile(self, character_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -442,7 +442,7 @@ class AsyncFirebaseService:
         # 呼叫同步版 set_document
         return await asyncio.to_thread(
             self.firebase_service.set_document,
-            f"users/{user_id}/spend_logs",  # ← 直接傳路徑
+            f"Users/{user_id}/spend_logs",  # ← 直接傳路徑
             message_id,
             data,
             merge,
