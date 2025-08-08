@@ -93,6 +93,7 @@ class AsyncMessageHandler:
             usage = response.get("usage")
             usage["ticket_cost"] = int(ticket_cost)
             usage["character"] = ai_name
+            usage["character_id"] = character_id
             if usage:
                 # 寫入 Firestore
                 await self.firebase_service.upsert_channel_message_usage(
